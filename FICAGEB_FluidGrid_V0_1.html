@@ -1,0 +1,1874 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FICAGEB FluidGrid v0.1 — Fehmi Can Generate Backgrounds</title>
+<style>
+:root{
+  --bg:#1b1b1b; --panel:#232323; --panel-2:#2b2b2b; --field:#181818; --line:#363636;
+  --text:#bcbcbc; --hi:#ececec; --muted:#7a7a7a; --accent:#3d95ea; --accent-dim:#24527f;
+  --warn:#e3a73c; --ok:#58bd7c; --danger:#e0605a;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+  font:12px/1.4 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+.app{display:grid;grid-template-rows:38px minmax(0,1fr);height:100vh}
+header{display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid #111}
+.brand{display:flex;align-items:baseline;gap:8px}
+.logo{color:var(--hi);font-weight:700;letter-spacing:.06em;font-size:14px}
+.gen{color:var(--hi);font-weight:600}
+.ver{color:var(--accent);font-weight:600}
+.sub{color:var(--muted)}
+.spacer{flex:1}
+.hstat{color:var(--muted)}
+.main{display:grid;grid-template-columns:310px minmax(0,1fr) 350px;min-height:0}
+aside{overflow-y:auto;background:var(--panel);min-height:0}
+.left{border-right:1px solid #111}
+.right{border-left:1px solid #111;display:flex;flex-direction:column}
+.center{display:grid;grid-template-rows:minmax(0,1fr) auto;min-width:0;min-height:0;background:#151515}
+.viewport{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+.stage{position:relative;box-shadow:0 0 0 1px #000}
+.stage canvas{display:block;width:100%;height:100%}
+.stage.picking{cursor:crosshair}
+
+.safe{position:absolute;inset:0;pointer-events:none}
+.safe[hidden]{display:none}
+.sz{position:absolute;border:1px dashed rgba(255,255,255,.5);mix-blend-mode:difference}
+.sz.action{inset:3.5%}
+.sz.title{inset:5% 10%}
+.sz.lower{left:5%;top:74%;width:45%;height:16%;border-style:solid}
+.sz.logo{right:5%;top:6%;width:12%;height:12%;border-style:solid}
+.sz span{position:absolute;left:6px;top:4px;color:#fff;font-size:11px}
+
+.timeline{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--panel);border-top:1px solid #111;flex-wrap:wrap}
+.timeline input[type=range]{flex:1;min-width:160px}
+.tc{color:var(--hi);min-width:150px}
+.tc small{color:var(--muted)}
+.muted{color:var(--muted)}
+
+details.sec{border-bottom:1px solid #161616}
+details.sec>summary{list-style:none;cursor:pointer;padding:7px 12px;background:var(--panel-2);color:var(--hi);font-weight:600;user-select:none;display:flex;align-items:center;gap:8px}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::before{content:"";border:4px solid transparent;border-left-color:var(--muted);margin-right:2px;transform-origin:2px 4px;transition:transform .12s}
+details.sec[open]>summary::before{transform:rotate(90deg)}
+.sec-body{padding:8px 12px 12px;display:grid;gap:6px}
+.sub-h{color:var(--hi);font-weight:600;margin-top:6px}
+
+.row{display:grid;grid-template-columns:18px 96px minmax(0,1fr) 58px;align-items:center;gap:6px}
+.row.nolock{grid-template-columns:114px minmax(0,1fr) 58px}
+.row .wide{grid-column:span 2}
+.lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.num{width:100%;background:transparent;border:1px solid transparent;border-radius:2px;color:var(--accent);padding:2px 4px;text-align:right;cursor:ew-resize}
+.num:hover{border-color:var(--line)}
+.num:focus{background:var(--field);border-color:var(--accent);cursor:text;color:var(--hi)}
+.txt{width:100%;background:var(--field);border:1px solid var(--line);border-radius:2px;padding:4px 6px;color:var(--hi)}
+.txt:focus{border-color:var(--accent);outline:none}
+textarea.txt{resize:vertical;min-height:70px}
+select{background:var(--field);border:1px solid var(--line);border-radius:2px;padding:3px 4px;color:var(--hi);min-width:0}
+
+input[type=range]{-webkit-appearance:none;appearance:none;height:16px;background:transparent;width:100%;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:#3a3a3a;border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#d4d4d4;margin-top:-3.5px;border:0}
+input[type=range]:hover::-webkit-slider-thumb{background:#fff}
+input[type=range]::-moz-range-track{height:3px;background:#3a3a3a;border-radius:2px}
+input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:#d4d4d4;border:0}
+
+.lock{width:18px;height:18px;padding:0;border:0;background:transparent;color:#555;cursor:pointer;display:grid;place-items:center;border-radius:2px}
+.lock:hover{color:var(--text)}
+.lock.on{color:var(--warn)}
+
+.btn{background:#383838;border:1px solid #444;border-radius:3px;padding:4px 10px;color:var(--hi);cursor:pointer;white-space:nowrap}
+.btn:hover{background:#424242}
+.btn.primary{background:var(--accent-dim);border-color:#3576b3}
+.btn.primary:hover{background:#2b6299}
+.btn.danger{border-color:#7a3a37}
+.btn:disabled{opacity:.45;cursor:default}
+.btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.hint{margin:0;color:var(--muted)}
+.badge{color:var(--warn)}
+
+.switch{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{width:26px;height:14px;border-radius:7px;background:#3c3c3c;position:relative;flex:none;transition:background .12s}
+.switch .track::after{content:"";position:absolute;left:2px;top:2px;width:10px;height:10px;border-radius:50%;background:#9a9a9a;transition:transform .12s,background .12s}
+.switch input:checked+.track{background:var(--accent-dim)}
+.switch input:checked+.track::after{transform:translateX(12px);background:#fff}
+.switch input:focus-visible+.track{outline:1px solid var(--accent)}
+.switch.main-t span:last-child{color:var(--hi);font-weight:600}
+
+.starters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.starters button{background:var(--field);border:1px solid var(--line);border-radius:3px;padding:6px 4px;cursor:pointer;color:var(--hi)}
+.starters button:hover{border-color:var(--accent)}
+.vars{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.vars button{padding:0;border:1px solid var(--line);background:#000;cursor:pointer;border-radius:2px;overflow:hidden;display:block}
+.vars button:hover{border-color:var(--accent)}
+.vars canvas{display:block;width:100%;height:auto}
+
+.tabs{display:flex;background:var(--panel-2);border-bottom:1px solid #111;flex:none}
+.tabs button{flex:1;padding:9px 0;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;font-weight:600}
+.tabs button.active{color:var(--hi);border-bottom-color:var(--accent)}
+.tabpane{overflow-y:auto;flex:1;min-height:0}
+.tabpane[hidden]{display:none}
+
+.palette{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.sw{display:grid;gap:3px;justify-items:center}
+.sw b{color:var(--hi);font-size:13px}
+.sw input[type=color]{width:100%;height:34px;padding:0;border:1px solid #444;border-radius:2px;background:none;cursor:pointer}
+.sw input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.sw input[type=color]::-webkit-color-swatch{border:0}
+.sw .hex{width:100%;background:transparent;border:1px solid transparent;color:var(--muted);font-size:10px;text-align:center;padding:1px 0}
+.sw .hex:focus{background:var(--field);border-color:var(--accent);color:var(--hi);outline:none}
+.erow{display:grid;grid-template-columns:minmax(0,1fr) 14px 34px 74px 44px;align-items:center;gap:6px}
+.erow .num{text-align:center}
+.chip{width:14px;height:14px;border-radius:2px;border:1px solid rgba(255,255,255,.25)}
+.ehead{display:grid;grid-template-columns:minmax(0,1fr) 54px 122px;color:var(--muted);font-size:11px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.pset{display:flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--line);border-radius:3px;padding:3px 4px 3px 6px;cursor:pointer}
+.pset:hover{border-color:var(--accent)}
+.pset i{display:flex}
+.pset i span{width:9px;height:14px}
+.pset .x{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 3px}
+.pset .x:hover{color:var(--danger)}
+.imgprev{max-width:100%;max-height:70px;border:1px solid var(--line);background:#000;display:block}
+
+.lib{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lib-item{display:grid;gap:3px;text-align:left;background:var(--field);border:1px solid var(--line);border-radius:3px;padding:5px;cursor:pointer}
+.lib-item:hover{border-color:#555}
+.lib-item.active{border-color:var(--accent)}
+.lib-item img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+.lib-item span{color:var(--hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib-item small{color:var(--muted)}
+.empty{color:var(--muted);margin:4px 0}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.field{display:grid;gap:3px}
+.field>span{color:var(--muted);font-size:11px}
+.field .num{text-align:left;background:var(--field);border-color:var(--line)}
+.info{color:var(--muted)}
+.info b{color:var(--hi);font-weight:600}
+.progress{height:6px;background:#333;border-radius:3px;overflow:hidden}
+.progress div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.status{min-height:18px}
+.status.warn{color:var(--warn)} .status.err{color:var(--danger)} .status.ok{color:var(--ok)}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10;padding:24px}
+.modal[hidden]{display:none}
+.modal-box{background:var(--panel);border:1px solid #444;border-radius:4px;max-width:100%;max-height:100%;display:flex;flex-direction:column}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:8px 12px;border-bottom:1px solid #111;color:var(--hi)}
+.modal-body{overflow:auto;background:#000}
+.modal-body canvas{display:block}
+.toast{position:fixed;right:16px;bottom:16px;background:#333;border:1px solid #4a4a4a;color:var(--hi);padding:8px 12px;border-radius:3px;opacity:0;transform:translateY(6px);transition:all .18s;pointer-events:none;z-index:20}
+.toast.show{opacity:1;transform:none}
+
+@media (max-width:1100px){ .main{grid-template-columns:270px minmax(0,1fr) 310px} }
+@media (max-width:860px){
+  .app{height:auto;grid-template-rows:auto auto}
+  .main{grid-template-columns:1fr}
+  .center{height:60vh;order:-1}
+  aside{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><span class="logo">FICAGEB</span><span class="gen">FluidGrid</span><span class="ver">v0.1</span><span class="sub">Fehmi Can Generate Backgrounds</span></div>
+    <div class="spacer"></div>
+    <div class="hstat" id="perf"></div>
+  </header>
+  <div class="main">
+    <aside class="left" id="left"></aside>
+    <div class="center">
+      <div class="viewport" id="viewport">
+        <div class="stage" id="stage">
+          <canvas id="cv"></canvas>
+          <div class="safe" id="safe" hidden>
+            <div class="sz action"></div><div class="sz title"></div>
+            <div class="sz lower"><span>Speaker name and title</span></div>
+            <div class="sz logo"><span>Logo</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+    <aside class="right" id="right"></aside>
+  </div>
+</div>
+<div class="modal" id="cropModal" hidden>
+  <div class="modal-box">
+    <div class="modal-head"><span id="cropTitle">1:1 crop</span><button class="btn" id="cropClose" type="button">Close</button></div>
+    <div class="modal-body" id="cropBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const GEN = 'fluidgrid', VERSION = '0.1';
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+function h(tag, attrs = {}, ...kids){
+  const e = document.createElement(tag);
+  for(const [k, v] of Object.entries(attrs)){
+    if(v === undefined || v === null) continue;
+    if(k === 'class') e.className = v;
+    else if(k === 'text') e.textContent = v;
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for(const c of kids.flat()) if(c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const TAU = Math.PI*2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const mix = (a, b, t) => a + (b - a)*t;
+const smooth = (e0, e1, x) => { const t = clamp((x - e0)/((e1 - e0) || 1e-9), 0, 1); return t*t*(3 - 2*t); };
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast('Could not save: browser storage is full or blocked'); return false; } }
+};
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function btn(label, fn, cls = ''){ return h('button', {class:'btn ' + cls, onclick:fn, type:'button'}, label); }
+function fmtTime(ms){ const s = Math.round(ms/1000); const hh = Math.floor(s/3600), mm = Math.floor(s%3600/60), ss = s%60; return hh ? `${hh} h ${mm} min` : mm ? `${mm} min ${ss} s` : `${ss} s`; }
+function fmtBytes(b){ if(b > 1e9) return (b/1e9).toFixed(1) + ' GB'; if(b > 1e6) return (b/1e6).toFixed(1) + ' MB'; return Math.round(b/1e3) + ' KB'; }
+const lockSvg = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('width', '11'); s.setAttribute('height', '12'); s.setAttribute('viewBox', '0 0 11 12'); s.innerHTML = '<rect x="1" y="5" width="9" height="7" rx="1" fill="currentColor"/><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5" fill="none" stroke="currentColor" stroke-width="1.4"/>'; return s; };
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; }; }
+function ihash(n){ n = Math.imul(n ^ (n >>> 16), 0x7feb352d); n = Math.imul(n ^ (n >>> 15), 0x846ca68b); n ^= n >>> 16; return (n >>> 0)/4294967296; }
+const hh2 = (a, b = 0) => ihash(Math.imul(a + 1, 0x9E3779B1) ^ Math.imul(b + 7, 0x85EBCA77));
+const hash3 = (a, b, c) => ihash(Math.imul(a + 11, 0x9E3779B1) ^ Math.imul(b + 13, 0x85EBCA77) ^ Math.imul(c + 17, 0xC2B2AE3D));
+function download(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+
+/* ================= simplex noise ================= */
+const PERM = new Uint8Array(512);
+{ const r = mulberry32(1337), p = [...Array(256).keys()]; for(let i = 255; i > 0; i--){ const j = Math.floor(r()*(i + 1)); [p[i], p[j]] = [p[j], p[i]]; } for(let i = 0; i < 512; i++) PERM[i] = p[i & 255]; }
+const GR3 = [1,1,0,-1,1,0,1,-1,0,-1,-1,0,1,0,1,-1,0,1,1,0,-1,-1,0,-1,0,1,1,0,-1,1,0,1,-1,0,-1,-1];
+function snoise3(x, y, z){
+  const F3 = 1/3, G3 = 1/6;
+  const s = (x + y + z)*F3, i = Math.floor(x + s), j = Math.floor(y + s), k = Math.floor(z + s);
+  const t = (i + j + k)*G3, x0 = x - (i - t), y0 = y - (j - t), z0 = z - (k - t);
+  let i1, j1, k1, i2, j2, k2;
+  if(x0 >= y0){ if(y0 >= z0){ i1=1;j1=0;k1=0;i2=1;j2=1;k2=0; } else if(x0 >= z0){ i1=1;j1=0;k1=0;i2=1;j2=0;k2=1; } else { i1=0;j1=0;k1=1;i2=1;j2=0;k2=1; } }
+  else { if(y0 < z0){ i1=0;j1=0;k1=1;i2=0;j2=1;k2=1; } else if(x0 < z0){ i1=0;j1=1;k1=0;i2=0;j2=1;k2=1; } else { i1=0;j1=1;k1=0;i2=1;j2=1;k2=0; } }
+  const x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3;
+  const x2 = x0 - i2 + 2*G3, y2 = y0 - j2 + 2*G3, z2 = z0 - k2 + 2*G3;
+  const x3 = x0 - 1 + 3*G3, y3 = y0 - 1 + 3*G3, z3 = z0 - 1 + 3*G3;
+  const ii = i & 255, jj = j & 255, kk = k & 255;
+  let n = 0, g, tt;
+  tt = 0.6 - x0*x0 - y0*y0 - z0*z0; if(tt > 0){ g = (PERM[ii + PERM[jj + PERM[kk]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x0 + GR3[g+1]*y0 + GR3[g+2]*z0); }
+  tt = 0.6 - x1*x1 - y1*y1 - z1*z1; if(tt > 0){ g = (PERM[ii + i1 + PERM[jj + j1 + PERM[kk + k1]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x1 + GR3[g+1]*y1 + GR3[g+2]*z1); }
+  tt = 0.6 - x2*x2 - y2*y2 - z2*z2; if(tt > 0){ g = (PERM[ii + i2 + PERM[jj + j2 + PERM[kk + k2]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x2 + GR3[g+1]*y2 + GR3[g+2]*z2); }
+  tt = 0.6 - x3*x3 - y3*y3 - z3*z3; if(tt > 0){ g = (PERM[ii + 1 + PERM[jj + 1 + PERM[kk + 1]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x3 + GR3[g+1]*y3 + GR3[g+2]*z3); }
+  return 32*n;
+}
+/* Time-aware noise. LC is a point on a circle (loop) or a line (free-running). */
+function lnoise(x, y, z, LC){ return 0.7071*(snoise3(x, y, z + LC[0]) + snoise3(y + 31.4, x + 17.7, z + LC[1])); }
+function fbm(x, y, z, oct, turb, LC){
+  let a = 0.5, s = 0, n = 0;
+  for(let i = 0; i < oct; i++){
+    let v = lnoise(x, y, z + i*3.1, LC);
+    if(turb > 0) v = mix(v, 0.8 - 1.6*Math.abs(v), turb);
+    s += a*v; n += a;
+    const nx = 1.6*x - 1.2*y, ny = 1.2*x + 1.6*y; x = nx; y = ny; a *= 0.5;
+  }
+  return s/n;
+}
+const seedOff = s => [((s*0.6180339887) % 1)*97, ((s*0.4142135623) % 1)*89];
+
+/* ================= definitions ================= */
+const ELEMENTS = ['Background','Background 2','Shape A','Shape B','Shape C','Shape D','Accent node','Keyline','Ghost grid','Construction lines','Scanlines','Dust'];
+const EL = {bg:0, bg2:1, A:2, B:3, C:4, D:5, accent:6, key:7, ghost:8, constr:9, scan:10, dust:11};
+const DEFS = [
+  // layout
+  {k:'layout', t:'select', l:'Layout', o:[['square','Square grid'],['hex','Hex grid'],['radial','Radial emblems']], d:'square', s:'layout'},
+  {k:'pitch', t:'num', l:'Grid spacing', min:0.03, max:0.5, step:0.001, d:0.12, s:'layout', rnd:[0.07, 0.22]},
+  {k:'gridRot', t:'num', l:'Grid rotation °', min:-90, max:90, step:1, d:0, s:'layout'},
+  {k:'occupancy', t:'num', l:'Filled cells', min:0, max:1, step:0.01, d:0.5, s:'layout', rnd:[0.25, 0.85]},
+  {k:'emCols', t:'num', l:'Emblem columns', min:1, max:12, step:1, int:true, d:1, s:'layout', drag:0.1},
+  {k:'emRows', t:'num', l:'Emblem rows', min:1, max:6, step:1, int:true, d:1, s:'layout', drag:0.1},
+  {k:'emSize', t:'num', l:'Emblem size', min:0.1, max:1.6, step:0.01, d:0.7, s:'layout'},
+  {k:'emVary', t:'toggle', l:'Different motif per emblem', d:true, s:'layout'},
+  {k:'emSpinAlt', t:'toggle', l:'Alternate spin direction per emblem', d:false, s:'layout'},
+  // nodes
+  {k:'nodeR', t:'num', l:'Node size', min:0.05, max:0.8, step:0.005, d:0.32, s:'nodes', rnd:[0.22, 0.42]},
+  {k:'nodeVar', t:'num', l:'Size variation', min:0, max:1, step:0.01, d:0, s:'nodes', rnd:[0, 0.35]},
+  {k:'goo', t:'num', l:'Fusion reach', min:0, max:2, step:0.01, d:0.4, s:'nodes', rnd:[0.15, 0.9]},
+  {k:'neck', t:'num', l:'Bond thickness', min:0.05, max:1, step:0.01, d:0.5, s:'nodes', rnd:[0.3, 0.75]},
+  // grid motion
+  {k:'moverShare', t:'num', l:'Moving nodes', min:0, max:1, step:0.01, d:0.5, s:'gmove', rnd:[0.2, 0.8]},
+  {k:'moves', t:'num', l:'Steps per loop', min:0, max:16, step:2, int:true, d:2, s:'gmove', drag:0.1},
+  {k:'stepSize', t:'num', l:'Cells per step', min:1, max:3, step:1, int:true, d:1, s:'gmove', drag:0.1},
+  {k:'stepDur', t:'num', l:'Step duration (part of each slot)', min:0.05, max:1, step:0.01, d:0.55, s:'gmove'},
+  {k:'stepJitter', t:'num', l:'Timing randomness', min:0, max:1, step:0.01, d:0.85, s:'gmove'},
+  {k:'dirs', t:'select', l:'Directions', o:[['axis','Along the grid'],['diag','Along the grid and diagonals']], d:'axis', s:'gmove'},
+  {k:'reverseShare', t:'num', l:'Out-and-back share', min:0, max:1, step:0.01, d:0.3, s:'gmove'},
+  // mitosis
+  {k:'mitoShare', t:'num', l:'Dividing nodes', min:0, max:1, step:0.01, d:0.3, s:'mito', rnd:[0, 0.6]},
+  {k:'mitoCount', t:'num', l:'Divisions per loop', min:1, max:4, step:1, int:true, d:1, s:'mito', drag:0.1},
+  {k:'mitoDur', t:'num', l:'Split duration (part of loop)', min:0.02, max:0.45, step:0.005, d:0.12, s:'mito'},
+  {k:'mitoApart', t:'num', l:'Time apart (part of window)', min:0, max:0.95, step:0.01, d:0.4, s:'mito'},
+  {k:'mitoVar', t:'num', l:'Time apart variation', min:0, max:1, step:0.01, d:0.6, s:'mito'},
+  {k:'mitoDist', t:'num', l:'Split distance (cells)', min:0.3, max:3, step:0.05, d:1, s:'mito'},
+  {k:'mitoSquash', t:'num', l:'Squash while splitting', min:0, max:0.5, step:0.01, d:0.12, s:'mito'},
+  // bonds
+  {k:'bondShare', t:'num', l:'Bonding neighbors', min:0, max:1, step:0.01, d:0.15, s:'bond', rnd:[0, 0.5]},
+  {k:'bondHold', t:'num', l:'Bond time (part of loop)', min:0.02, max:0.96, step:0.01, d:0.35, s:'bond'},
+  {k:'bondDur', t:'num', l:'Form and break time', min:0.02, max:0.4, step:0.005, d:0.1, s:'bond'},
+  // radial emblem
+  {k:'sym', t:'num', l:'Symmetry (arms)', min:1, max:12, step:1, int:true, d:6, s:'radial', rnd:[3, 8], drag:0.1},
+  {k:'mirror', t:'toggle', l:'Mirror each arm', d:false, s:'radial'},
+  {k:'rings', t:'num', l:'Rings', min:1, max:6, step:1, int:true, d:3, s:'radial', rnd:[1, 4], drag:0.1},
+  {k:'centerGap', t:'num', l:'Center gap', min:0, max:3, step:0.01, d:0.7, s:'radial'},
+  {k:'subdiv', t:'num', l:'Slots per arm', min:1, max:4, step:1, int:true, d:2, s:'radial', drag:0.1},
+  {k:'armLen', t:'num', l:'Nodes per arm', min:1, max:10, step:1, int:true, d:3, s:'radial', rnd:[2, 6], drag:0.1},
+  {k:'branch', t:'num', l:'Branching', min:0, max:1, step:0.01, d:0.2, s:'radial', rnd:[0, 0.6]},
+  {k:'twist', t:'num', l:'Spiral bias', min:-1, max:1, step:0.01, d:0.4, s:'radial', rnd:[-1, 1]},
+  {k:'sizeByRing', t:'num', l:'Size by ring', min:-1, max:1, step:0.01, d:0.3, s:'radial', rnd:[-0.5, 0.8]},
+  {k:'armOffset', t:'num', l:'Arm angle °', min:-180, max:180, step:1, d:0, s:'radial'},
+  {k:'centerDot', t:'toggle', l:'Center node', d:true, s:'radial'},
+  {k:'chainLinks', t:'toggle', l:'Bond the nodes along each arm', d:true, s:'radial'},
+  // radial motion
+  {k:'spinSteps', t:'num', l:'Spin (arm steps per loop)', min:-12, max:12, step:1, int:true, d:1, s:'rmotion', drag:0.1},
+  {k:'spinStyle', t:'select', l:'Spin style', o:[['ticks','Ticks with easing'],['smooth','Continuous']], d:'ticks', s:'rmotion'},
+  {k:'tickDur', t:'num', l:'Tick duration (part of each step)', min:0.05, max:1, step:0.01, d:0.45, s:'rmotion'},
+  {k:'shear', t:'num', l:'Ring counter-rotation °', min:0, max:180, step:1, d:0, s:'rmotion'},
+  {k:'shearCycles', t:'num', l:'Counter-rotation cycles', min:1, max:6, step:1, int:true, d:1, s:'rmotion', drag:0.1},
+  {k:'rewire', t:'num', l:'Motifs to morph through', min:1, max:6, step:1, int:true, d:1, s:'rmotion', drag:0.1},
+  {k:'morphDur', t:'num', l:'Morph time (part of each motif)', min:0.05, max:1, step:0.01, d:0.4, s:'rmotion'},
+  // 3D
+  {k:'threeMode', t:'select', l:'3D', o:[['off','Off'],['spheres','Spheres (molecule turns in depth)'],['flat','Flat disc (shapes squash like a card)']], d:'off', s:'three'},
+  {k:'turnMode', t:'select', l:'Turn', o:[['swing','Swing back and forth'],['spin','Full turns']], d:'swing', s:'three'},
+  {k:'turnAmt', t:'num', l:'Swing amount °', min:0, max:180, step:1, d:55, s:'three'},
+  {k:'turnCycles', t:'num', l:'Turn cycles', min:0, max:6, step:1, int:true, d:1, s:'three', drag:0.1},
+  {k:'turnAxis', t:'num', l:'Turn axis °', min:-90, max:90, step:1, d:0, s:'three'},
+  {k:'tiltX', t:'num', l:'Tilt °', min:-80, max:80, step:1, d:0, s:'three'},
+  {k:'persp', t:'num', l:'Perspective', min:0, max:1, step:0.01, d:0.4, s:'three'},
+  {k:'depth', t:'num', l:'Depth', min:0, max:2, step:0.01, d:0.7, s:'three'},
+  {k:'depthFade', t:'num', l:'Depth fade', min:0, max:1, step:0.01, d:0, s:'three'},
+  {k:'turnOffset', t:'num', l:'Offset per emblem', min:0, max:1, step:0.01, d:0.12, s:'three'},
+  // finale
+  {k:'finMode', t:'select', l:'Gather into a dot', o:[['off','Off'],['loop','Gather at the end, burst out at the start (loops)'],['end','Gather at the end only'],['start','Burst out at the start only']], d:'off', s:'finale'},
+  {k:'finPortion', t:'num', l:'Gather time (part of loop)', min:0.05, max:0.8, step:0.01, d:0.3, s:'finale'},
+  {k:'finBurst', t:'num', l:'Burst time (part of loop)', min:0.05, max:0.6, step:0.01, d:0.15, s:'finale'},
+  {k:'finHold', t:'num', l:'Hold as a dot (part of loop)', min:0, max:0.3, step:0.005, d:0.04, s:'finale'},
+  {k:'finTurn', t:'num', l:'3D turn while gathering °', min:0, max:540, step:1, d:150, s:'finale'},
+  {k:'finSwirl', t:'num', l:'Swirl turns', min:-3, max:3, step:0.01, d:0.25, s:'finale'},
+  {k:'finStagger', t:'num', l:'Stagger (outer nodes arrive later)', min:0, max:0.9, step:0.01, d:0.35, s:'finale'},
+  {k:'finDot', t:'num', l:'Dot size (× node size)', min:0, max:4, step:0.01, d:1.2, s:'finale'},
+  {k:'finShrink', t:'toggle', l:'Dot shrinks away at the very end', d:false, s:'finale'},
+  {k:'finX', t:'num', l:'Gather point X (grids)', min:-1, max:1, step:0.01, d:0, s:'finale'},
+  {k:'finY', t:'num', l:'Gather point Y (grids)', min:-0.5, max:0.5, step:0.01, d:0, s:'finale'},
+  // easing
+  {k:'easeOut', t:'num', l:'Ease out (leaving) %', min:0, max:100, step:1, d:65, s:'ease'},
+  {k:'easeIn', t:'num', l:'Ease in (arriving) %', min:0, max:100, step:1, d:65, s:'ease'},
+  {k:'overshoot', t:'num', l:'Overshoot', min:0, max:0.6, step:0.01, d:0, s:'ease'},
+  // style
+  {k:'polarity', t:'select', l:'Polarity', o:[['pos','Shapes on the background'],['neg','Shapes cut out of a solid field']], d:'pos', s:'style'},
+  {k:'fillMode', t:'select', l:'Fill', o:[['fill','Solid'],['outline','Outline'],['mixed','Mixed (per group)']], d:'fill', s:'style'},
+  {k:'outlineShare', t:'num', l:'Outline share (Mixed)', min:0, max:1, step:0.01, d:0.4, s:'style'},
+  {k:'strokeW', t:'num', l:'Outline width (× node size)', min:0.02, max:0.6, step:0.005, d:0.1, s:'style'},
+  {k:'keyline', t:'toggle', l:'Keyline around shapes', d:false, s:'style', main:true},
+  {k:'keyW', t:'num', l:'Keyline width (× node size)', min:0.02, max:0.6, step:0.005, d:0.1, s:'style'},
+  {k:'ghost', t:'toggle', l:'Ghost grid (all slots as rings)', d:false, s:'style', main:true},
+  {k:'ghostW', t:'num', l:'Ghost line width (× node size)', min:0.01, max:0.3, step:0.005, d:0.05, s:'style'},
+  {k:'constr', t:'toggle', l:'Construction lines', d:false, s:'style', main:true},
+  {k:'constrW', t:'num', l:'Construction line width', min:0.0005, max:0.01, step:0.0001, d:0.0012, s:'style'},
+  // color mapping
+  {k:'colorMode', t:'select', l:'Color mode', o:[['single','One color (Shape A)'],['group','Per group (Shape A to D)'],['random','Random per node (Shape A to D)'],['ramp','Color ramp']], d:'single', s:'colmap'},
+  {k:'shareB', t:'num', l:'Shape B share', min:0, max:1, step:0.01, d:0.35, s:'colmap'},
+  {k:'shareC', t:'num', l:'Shape C share', min:0, max:1, step:0.01, d:0, s:'colmap'},
+  {k:'shareD', t:'num', l:'Shape D share', min:0, max:1, step:0.01, d:0, s:'colmap'},
+  {k:'accentShare', t:'num', l:'Accent nodes', min:0, max:0.3, step:0.005, d:0, s:'colmap'},
+  {k:'ramp', t:'text', l:'Ramp color numbers, in order (e.g. 4,5,6)', d:'4,5,6', s:'colmap'},
+  {k:'rampSrc', t:'select', l:'Ramp source', o:[['axis','Position along a direction'],['radial','Distance from the center'],['noise','Noise'],['random','Random per node']], d:'axis', s:'colmap'},
+  {k:'rampAngle', t:'num', l:'Ramp direction °', min:-180, max:180, step:1, d:90, s:'colmap'},
+  {k:'rampScale', t:'num', l:'Ramp noise scale', min:0.1, max:8, step:0.01, d:1.5, s:'colmap'},
+  {k:'rampContrast', t:'num', l:'Ramp contrast', min:0.2, max:4, step:0.01, d:1, s:'colmap'},
+  {k:'rampOffset', t:'num', l:'Ramp offset', min:-1, max:1, step:0.01, d:0, s:'colmap'},
+  {k:'rampSmooth', t:'toggle', l:'Blend between ramp colors', d:true, s:'colmap'},
+  {k:'rampCyclic', t:'toggle', l:'Ramp loops back to the first color', d:false, s:'colmap'},
+  {k:'bridgeBlend', t:'toggle', l:'Blend colors across bonds', d:true, s:'colmap'},
+  {k:'edgeFade', t:'num', l:'Fade toward frame edges', min:0, max:1, step:0.01, d:0, s:'colmap'},
+  {k:'edgeWidth', t:'num', l:'Edge fade width', min:0.02, max:0.8, step:0.01, d:0.25, s:'colmap'},
+  // background
+  {k:'bgType', t:'select', l:'Background', o:[['flat','Flat'],['linear','Linear gradient'],['radial','Radial gradient']], d:'flat', s:'bg'},
+  {k:'bgAngle', t:'num', l:'Angle °', min:-180, max:180, step:1, d:90, s:'bg'},
+  {k:'bgSpread', t:'num', l:'Spread', min:0.1, max:3, step:0.01, d:1, s:'bg'},
+  // motion (shared)
+  {k:'breathe', t:'num', l:'Breathing', min:0, max:0.6, step:0.01, d:0, s:'motion', rnd:[0, 0.25]},
+  {k:'breathCycles', t:'num', l:'Breath cycles', min:0, max:8, step:1, int:true, d:1, s:'motion', drag:0.1},
+  {k:'breathMode', t:'select', l:'Breath pattern', o:[['random','Random'],['wave','Wave across'],['radial','From the center']], d:'random', s:'motion'},
+  {k:'wander', t:'num', l:'Wander', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.4]},
+  {k:'wanderSpeed', t:'num', l:'Wander speed', min:0, max:3, step:0.01, d:0.5, s:'motion'},
+  {k:'drift', t:'num', l:'Color drift cycles', min:0, max:8, step:1, int:true, d:0, s:'motion', drag:0.1},
+  // finishing
+  {k:'vigOn', t:'toggle', l:'Vignette', d:false, s:'finish', main:true},
+  {k:'vig', t:'num', l:'Amount', min:0, max:1, step:0.01, d:0.35, s:'finish'},
+  {k:'grainOn', t:'toggle', l:'Grain', d:false, s:'finish', main:true},
+  {k:'grain', t:'num', l:'Amount', min:0, max:1, step:0.01, d:0.25, s:'finish'},
+  {k:'grainSize', t:'num', l:'Grain size px', min:1, max:6, step:0.5, d:1.5, s:'finish'},
+  {k:'scanOn', t:'toggle', l:'Scanlines and LED dots', d:false, s:'finish', main:true},
+  {k:'scanType', t:'select', l:'Type', o:[['lines','Scanlines'],['dots','LED dots']], d:'lines', s:'finish'},
+  {k:'scanSize', t:'num', l:'Size px at 1080', min:1, max:16, step:0.5, d:3, s:'finish'},
+  {k:'scanAmt', t:'num', l:'Amount', min:0, max:1, step:0.01, d:0.25, s:'finish'},
+  {k:'dustOn', t:'toggle', l:'Dust and scratches', d:false, s:'finish', main:true},
+  {k:'dust', t:'num', l:'Amount', min:0, max:1, step:0.01, d:0.3, s:'finish'},
+  {k:'dustSize', t:'num', l:'Size', min:0.3, max:4, step:0.05, d:1.5, s:'finish'},
+  // gradient layer
+  {k:'gOn', t:'toggle', l:'Use gradient layer', d:false, s:'grad', main:true},
+  {k:'gType', t:'select', l:'Type', o:[['ridged','Ridged noise (veins)'],['noise','Noise'],['linear','Linear'],['radial','Radial'],['image','Image']], d:'noise', s:'grad'},
+  {k:'gScale', t:'num', l:'Scale', min:0.2, max:8, step:0.01, d:1.6, s:'grad'},
+  {k:'gDetail', t:'num', l:'Detail', min:1, max:6, step:1, int:true, d:3, s:'grad', drag:0.1},
+  {k:'gTravel', t:'num', l:'Speed', min:0, max:3, step:0.01, d:0.4, s:'grad'},
+  {k:'gCycles', t:'num', l:'Sweep cycles', min:0, max:8, step:1, int:true, d:1, s:'grad', drag:0.1},
+  {k:'gDir', t:'num', l:'Direction °', min:-180, max:180, step:1, d:30, s:'grad'},
+  {k:'gTurb', t:'num', l:'Turbulence', min:0, max:1, step:0.01, d:0, s:'grad'},
+  {k:'gContrast', t:'num', l:'Contrast', min:0.2, max:4, step:0.01, d:1.4, s:'grad'},
+  {k:'gOffset', t:'num', l:'Offset', min:-0.6, max:0.6, step:0.01, d:0, s:'grad'},
+  {k:'gInvert', t:'toggle', l:'Invert', d:false, s:'grad'},
+  {k:'gCx', t:'num', l:'Center X', min:-1, max:1, step:0.01, d:0, s:'grad'},
+  {k:'gCy', t:'num', l:'Center Y', min:-0.5, max:0.5, step:0.01, d:0, s:'grad'},
+  {k:'gRadius', t:'num', l:'Radius', min:0.05, max:2, step:0.01, d:0.6, s:'grad'},
+  // gradient targets
+  {k:'tSize', t:'num', l:'Node size', min:-1, max:1, step:0.01, d:0, s:'targets'},
+  {k:'tVis', t:'num', l:'Visibility', min:-1, max:1, step:0.01, d:0, s:'targets'},
+  {k:'thresh', t:'num', l:'Threshold', min:0, max:1, step:0.01, d:0.4, s:'targets'},
+  {k:'threshSoft', t:'num', l:'Threshold softness', min:0.01, max:0.5, step:0.01, d:0.12, s:'targets'},
+  {k:'tGoo', t:'num', l:'Fusion reach', min:-1, max:1, step:0.01, d:0, s:'targets'},
+  {k:'tColor', t:'num', l:'Ramp position', min:-1, max:1, step:0.01, d:0, s:'targets'},
+];
+const DEF = Object.fromEntries(DEFS.map(d => [d.k, d]));
+const DEFAULT_PALETTE = ['#f6f4ef','#ebe7df','#1d1d1f','#f2b3c0','#c9c3df','#b6d0ec','#cc7a72'];
+const DEFAULT_IDX = [0,1,2,6,5,4,3,0,2,2,2,2];
+const DEFAULT_OP = [1,1,1,1,1,1,1,1,0.18,0.25,1,0.7];
+const DEFAULT_LOOK = () => ({
+  generator:GEN, seed:7,
+  params:Object.fromEntries(DEFS.map(d => [d.k, d.d])),
+  palette:[...DEFAULT_PALETTE],
+  idx:[...DEFAULT_IDX],
+  op:[...DEFAULT_OP],
+  motion:{dur:10, fps:25, calm:true, loop:true},
+  gImg:''
+});
+/* Starting points. p: parameters, pal: palette, map: element number -> palette index (0-based), op: element opacity */
+const DARK = ['#0c0c0d','#1b1b1d','#ffffff','#f2b3c0','#c9c3df','#b6d0ec','#cc7a72'];
+const STARTERS = {
+  'Cell field': {p:{layout:'square', pitch:0.12, occupancy:0.45, nodeR:0.3, goo:0.45, moverShare:0.5, moves:2, stepDur:0.55, mitoShare:0.35, mitoCount:1, bondShare:0.15}, pal:[...DEFAULT_PALETTE]},
+  'Pastel culture': {p:{layout:'hex', pitch:0.095, occupancy:0.5, nodeR:0.32, goo:0.6, neck:0.45, colorMode:'ramp', ramp:'4,5,6', rampSrc:'axis', rampAngle:90, edgeFade:0.45, edgeWidth:0.18, mitoShare:0.4, bondShare:0.3, moves:2, moverShare:0.4},
+    pal:['#f8f3f0','#f3ece8','#1d1d1f','#f7b4c0','#dcc9df','#c2d5ee','#e9dfe6']},
+  'Lime field': {p:{layout:'square', pitch:0.18, occupancy:0.55, nodeR:0.34, goo:0.55, polarity:'neg', mitoShare:0.45, moves:2, moverShare:0.35, bondShare:0.25},
+    pal:['#f1eff2','#e8e6ea','#7df07c','#2b2b2b','#c9c3df','#b6d0ec','#cc7a72']},
+  'Keyline duo': {p:{layout:'square', pitch:0.17, occupancy:0.7, nodeR:0.4, goo:0.12, neck:0.7, colorMode:'group', shareB:0.5, keyline:true, keyW:0.08, ghost:true, ghostW:0.04, fillMode:'mixed', outlineShare:0.5, bondShare:0.6, bondHold:0.7, moves:0, mitoShare:0.15},
+    pal:['#2a2526','#332d2f','#86b9d6','#cc7a72','#ffffff','#86b9d6','#cc7a72'], map:{7:4, 8:4}, op:{8:0.9}},
+  'Pinwheel': {p:{layout:'radial', sym:6, rings:3, centerGap:0.9, subdiv:2, armLen:4, twist:0.35, branch:0.1, sizeByRing:0.6, centerDot:true, nodeR:0.34, goo:0.06, neck:0.45, spinSteps:1, spinStyle:'ticks', emSize:0.75},
+    pal:['#fafafa','#f0f0ef','#232323','#f2b3c0','#c9c3df','#b6d0ec','#cc7a72']},
+  'Ring': {p:{layout:'radial', sym:6, rings:1, subdiv:2, armLen:2, twist:1, branch:0, centerDot:false, nodeR:0.36, goo:0.04, neck:0.38, spinSteps:1, spinStyle:'ticks', emSize:0.55}, pal:[...DARK]},
+  'Dumbbells': {p:{layout:'radial', sym:6, rings:2, centerGap:0.8, subdiv:1, armLen:2, twist:-0.15, branch:0, sizeByRing:0.5, centerDot:false, armOffset:18, nodeR:0.36, goo:0.04, neck:0.42, spinSteps:1, emSize:0.6}, pal:[...DARK]},
+  'Molecule turn': {p:{layout:'radial', sym:6, rings:3, armLen:3, branch:0.3, centerDot:true, nodeR:0.32, goo:0.15, spinSteps:0, threeMode:'spheres', turnMode:'swing', turnAmt:45, turnCycles:1, depth:0.6, depthFade:0, persp:0.45, emSize:0.75}, pal:[...DEFAULT_PALETTE]},
+  'Finale': {p:{layout:'radial', sym:6, mirror:false, rings:3, armLen:3, branch:0.2, centerDot:true, nodeR:0.3, goo:0.1, spinSteps:1, spinStyle:'ticks', finMode:'loop', finPortion:0.3, finBurst:0.15, finHold:0.04, finTurn:180, finSwirl:0.25, depth:0.9, emSize:0.7}, pal:[...DEFAULT_PALETTE]},
+  'Emblem wall': {p:{layout:'radial', emCols:5, emRows:3, emSize:0.8, emVary:true, emSpinAlt:true, sym:5, rings:3, armLen:4, branch:0.25, nodeR:0.34, goo:0.12, spinSteps:1, spinStyle:'ticks', rewire:2, morphDur:0.35}, pal:[...DARK]},
+};
+const FORMATS = [
+  ['HD 1920×1080', 1920, 1080], ['4K UHD 3840×2160', 3840, 2160], ['Wide LED 3840×1080', 3840, 1080],
+  ['Wide LED 7680×1080', 7680, 1080], ['12K LED 12000×2160', 12000, 2160], ['Square 1080×1080', 1080, 1080], ['Portrait 1080×1920', 1080, 1920]
+];
+const DEFAULT_R = () => ({w:1920, h:1080, full:true, start:0, end:249, draft:false,
+  parallel:Math.max(1, Math.min(6, Math.floor((navigator.hardwareConcurrency || 4)/2))), pattern:'FICAGEB_FluidGrid_####', skip:true});
+
+function normalizeLook(L){
+  const d = DEFAULT_LOOK(); if(!L || typeof L !== 'object') return d;
+  const out = Object.assign(d, L);
+  out.generator = GEN;
+  out.params = Object.assign(DEFAULT_LOOK().params, L.params || {});
+  out.motion = Object.assign(DEFAULT_LOOK().motion, L.motion || {});
+  if(!Array.isArray(out.palette) || out.palette.length !== 7) out.palette = [...DEFAULT_PALETTE];
+  const di = DEFAULT_LOOK();
+  const pad = (arr, def) => Array.isArray(arr) ? def.map((dv, k) => arr[k] ?? dv) : def;
+  out.idx = pad(out.idx, di.idx); out.op = pad(out.op, di.op);
+  if(typeof out.gImg !== 'string') out.gImg = '';
+  return out;
+}
+
+/* ================= state ================= */
+const SKEY = 'ficageb.fluidgrid.session';
+const session = store.get(SKEY, null);
+let look = normalizeLook(session && session.look);
+let locks = new Set(session && session.locks || []);
+let R = Object.assign(DEFAULT_R(), session && session.R || {});
+let frame = 0, tAcc = 0, playing = true, dirty = true, rendering = false, previewQ = 0.5, picking = false, view = 'result';
+let saveT;
+function scheduleSave(){ clearTimeout(saveT); saveT = setTimeout(() => store.set(SKEY, {look, locks:[...locks], R}), 500); }
+const totalFramesOf = L => Math.max(2, Math.round(L.motion.dur*L.motion.fps));
+const totalFrames = () => totalFramesOf(look);
+const syncers = [];
+function reg(fn){ syncers.push(fn); fn(); }
+function syncAll(){ syncers.forEach(f => f()); }
+function changed(){ dirty = true; scheduleSave(); }
+
+/* Calm motion: caps continuous speeds and cycles for the loop duration. Steps, ticks and events are already loop-timed. */
+function effectiveP(L){
+  const P = L.params, e = {breathCycles:P.breathCycles, drift:P.drift, wanderSpeed:P.wanderSpeed, gTravel:P.gTravel, gCycles:P.gCycles, limited:false};
+  if(L.motion.calm){
+    const dur = L.motion.dur, maxT = 0.5*dur/TAU, maxC = Math.max(0, Math.floor(0.3*dur)), maxD = Math.max(1, Math.floor(dur/10));
+    for(const k of ['wanderSpeed','gTravel']) if(e[k] > maxT){ e[k] = maxT; e.limited = true; }
+    for(const k of ['breathCycles','gCycles']) if(e[k] > maxC){ e[k] = maxC; e.limited = true; }
+    if(e.drift > maxD){ e.drift = maxD; e.limited = true; }
+  }
+  return e;
+}
+
+/* ================= image assets (symbol and gradient images) ================= */
+const assets = new Map();
+function getAsset(url){
+  if(!url) return null;
+  let a = assets.get(url);
+  if(!a){
+    a = {ready:false, img:new Image(), tints:new Map()};
+    assets.set(url, a);
+    a.img.onload = () => {
+      const iw = a.img.naturalWidth || 256, ih = a.img.naturalHeight || 256, sc = Math.min(1, 256/Math.max(iw, ih));
+      const w = Math.max(1, Math.round(iw*sc)), hgt = Math.max(1, Math.round(ih*sc));
+      const c = document.createElement('canvas'); c.width = w; c.height = hgt;
+      const x = c.getContext('2d'); x.drawImage(a.img, 0, 0, w, hgt);
+      const d = x.getImageData(0, 0, w, hgt).data;
+      a.w = w; a.h = hgt; a.lum = new Float32Array(w*hgt); a.alpha = new Float32Array(w*hgt);
+      for(let i = 0; i < w*hgt; i++){ const al = d[i*4 + 3]/255; a.alpha[i] = al; a.lum[i] = ((0.2126*d[i*4] + 0.7152*d[i*4 + 1] + 0.0722*d[i*4 + 2])/255)*al + (1 - al); }
+      a.rgb = new Uint8ClampedArray(d); a.ready = true; dirty = true; geomCache.key = null;
+    };
+    a.img.onerror = () => { a.failed = true; };
+    a.img.src = url;
+  }
+  return a.ready ? a : null;
+}
+async function preloadAssets(L){
+  for(const u of [L.symImg, L.gImg, L.bandImg]){ if(!u) continue; getAsset(u); const t0 = performance.now(); while(!assets.get(u).ready && !assets.get(u).failed && performance.now() - t0 < 5000) await sleep(30); }
+}
+function sampleAsset(a, arr, u, v){
+  if(u < 0 || u > 1 || v < 0 || v > 1) return null;
+  const x = Math.min(a.w - 1, Math.floor(u*a.w)), y = Math.min(a.h - 1, Math.floor(v*a.h));
+  return arr[y*a.w + x];
+}
+function tinted(a, color){
+  let c = a.tints.get(color); if(c) return c;
+  c = document.createElement('canvas'); c.width = a.img.naturalWidth || a.w; c.height = a.img.naturalHeight || a.h;
+  const x = c.getContext('2d'); x.drawImage(a.img, 0, 0, c.width, c.height); x.globalCompositeOperation = 'source-in'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+  a.tints.set(color, c); return c;
+}
+function readImageFile(file, maxDim){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => {
+      const sc = Math.min(1, maxDim/Math.max(img.naturalWidth || maxDim, img.naturalHeight || maxDim));
+      const c = document.createElement('canvas'); c.width = Math.max(1, Math.round((img.naturalWidth || maxDim)*sc)); c.height = Math.max(1, Math.round((img.naturalHeight || maxDim)*sc));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL('image/png'));
+    }; img.onerror = () => rej(new Error('This image could not be read')); img.src = r.result; };
+    r.onerror = () => rej(new Error('This file could not be read')); r.readAsDataURL(file);
+  });
+}
+
+/* ================= gradient layer ================= */
+function gradCtx(L, phase, A){
+  const P = L.params, E = effectiveP(L), tr = E.gTravel;
+  const LC = L.motion.loop ? [Math.cos(TAU*phase)*tr, Math.sin(TAU*phase)*tr] : [phase*TAU*tr, phase*TAU*tr*0.93];
+  const ang = P.gDir*Math.PI/180;
+  return {P, A, LC, so:seedOff(L.seed + 101), ca:Math.cos(ang), sa:Math.sin(ang), phase, cyc:E.gCycles, tr,
+    sweep:Math.sin(TAU*phase*E.gCycles), img:P.gType === 'image' ? getAsset(L.gImg) : null};
+}
+function gradValue(x, y, g){
+  const P = g.P; let v;
+  const rx = x*g.ca + y*g.sa, ry = -x*g.sa + y*g.ca;
+  switch(P.gType){
+    case 'noise': v = 0.5 + 0.6*fbm(rx*P.gScale + g.so[0], ry*P.gScale + g.so[1], 0, P.gDetail, P.gTurb, g.LC); break;
+    case 'linear': {
+      const w = P.gTurb > 0 ? P.gTurb*0.25*fbm(x*2 + g.so[0], y*2 + g.so[1], 3, 2, 0, g.LC) : 0;
+      v = 0.5 + (rx + w)*P.gScale*0.5 + 0.3*g.sweep; break;
+    }
+    case 'radial': {
+      const cx = P.gCx*g.A/2 + 0.12*g.tr*Math.cos(TAU*g.phase*g.cyc), cy = P.gCy + 0.12*g.tr*Math.sin(TAU*g.phase*g.cyc);
+      const w = P.gTurb > 0 ? P.gTurb*0.3*fbm(x*2 + g.so[0], y*2 + g.so[1], 3, 2, 0, g.LC) : 0;
+      v = 1 - (Math.hypot(x - cx, y - cy) + w)/P.gRadius; break;
+    }
+    case 'image': {
+      if(!g.img){ v = 0.5; break; }
+      const ia = g.img.w/g.img.h; let u, vv;
+      if(ia > g.A){ u = x/ia + 0.5; vv = y + 0.5; } else { u = x/g.A + 0.5; vv = y*g.A/ia + 0.5; }
+      const s = sampleAsset(g.img, g.img.lum, clamp(u, 0, 1), clamp(vv, 0, 1)); v = s == null ? 0.5 : s; break;
+    }
+    default: { const n = fbm(rx*P.gScale + g.so[0], ry*P.gScale + g.so[1], 0, P.gDetail, P.gTurb, g.LC); const r = 1 - Math.abs(n)*1.6; v = r < 0 ? 0 : r*r; }
+  }
+  v = clamp((v - 0.5)*P.gContrast + 0.5 + P.gOffset, 0, 1);
+  return P.gInvert ? 1 - v : v;
+}
+
+/* ================= color helpers ================= */
+function hexRgb(hx){ const n = parseInt(String(hx).slice(1), 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function toRGBA(css, a){
+  if(css[0] === '#'){ const [r, g, b] = hexRgb(css); return `rgba(${r},${g},${b},${a})`; }
+  return 'rgba(' + css.slice(css.indexOf('(') + 1, css.lastIndexOf(')')) + ',' + a + ')';
+}
+function buildRamp(L){
+  const P = L.params;
+  let nums = String(P.ramp || '').split(/[^0-9]+/).map(Number).filter(v => v >= 1 && v <= 7);
+  if(!nums.length) nums = [1, 7];
+  const cols = nums.map(v => hexRgb(L.palette[v - 1]));
+  if(P.rampCyclic) cols.push(cols[0]);
+  const m = cols.length - 1, lut = new Array(256);
+  for(let t = 0; t < 256; t++){
+    let c;
+    if(m <= 0) c = cols[0];
+    else {
+      const f = t/255*m;
+      if(!P.rampSmooth) c = cols[Math.min(m, Math.round(f))];
+      else { const i = Math.min(m - 1, Math.floor(f)), fr = f - i; c = [0, 1, 2].map(q => Math.round(cols[i][q] + (cols[i + 1][q] - cols[i][q])*fr)); }
+    }
+    lut[t] = `rgb(${c[0]},${c[1]},${c[2]})`;
+  }
+  return {lut, cyc:!!P.rampCyclic};
+}
+
+/* ================= drawing ================= */
+let grainCache = {f:-1, c:null};
+function grainCanvas(frm){
+  if(grainCache.f === frm) return grainCache.c;
+  const c = grainCache.c || document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d'), img = x.createImageData(256, 256), r = mulberry32(frm*7919 + 13);
+  for(let i = 0; i < img.data.length; i += 4){ const v = r()*255; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+  x.putImageData(img, 0, 0); grainCache = {f:frm, c}; return c;
+}
+const scanCache = {key:'', c:null};
+function scanTile(type, sz, color){
+  const key = type + '|' + sz + '|' + color;
+  if(scanCache.key === key) return scanCache.c;
+  const c = document.createElement('canvas'), x = c.getContext('2d');
+  c.width = c.height = sz;
+  x.fillStyle = color;
+  if(type === 'dots'){ x.fillRect(0, 0, sz, sz); x.globalCompositeOperation = 'destination-out'; x.beginPath(); x.arc(sz/2, sz/2, sz*0.42, 0, TAU); x.fill(); }
+  else x.fillRect(0, 0, sz, Math.max(1, Math.round(sz*0.4)));
+  scanCache.key = key; scanCache.c = c; return c;
+}
+const gradCanvas = document.createElement('canvas');
+function drawGradient(ctx, W, H, frm, L){
+  const A = W/H, gw = clamp(Math.round(W/4), 48, 360), gh = Math.max(2, Math.round(gw/A));
+  const phase = (frm % totalFramesOf(L))/totalFramesOf(L), g = gradCtx(L, phase, A);
+  gradCanvas.width = gw; gradCanvas.height = gh;
+  const x = gradCanvas.getContext('2d'), img = x.createImageData(gw, gh);
+  for(let j = 0; j < gh; j++) for(let i = 0; i < gw; i++){
+    const v = gradValue(((i + 0.5)/gw - 0.5)*A, (j + 0.5)/gh - 0.5, g);
+    const o = (j*gw + i)*4, c = Math.round(v*255); img.data[o] = img.data[o + 1] = img.data[o + 2] = c; img.data[o + 3] = 255;
+  }
+  x.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(gradCanvas, 0, 0, W, H);
+}
+function drawFrame(ctx, W, H, ox, oy, frm, L, mode = 'result'){
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  if(mode !== 'gradient') drawScene(ctx, W, H, ox, oy, frm, L);
+  if(mode === 'gradient' || mode === 'split'){
+    ctx.setTransform(1, 0, 0, 1, -ox, -oy);
+    if(mode === 'split'){ ctx.beginPath(); ctx.rect(0, 0, W/2, H); ctx.clip(); }
+    drawGradient(ctx, W, H, frm, L);
+  }
+  ctx.restore();
+}
+
+/* ================= easing (After Effects style influence) ================= */
+const wrap1 = v => v - Math.floor(v);
+const EASE_CACHE = new Map();
+function easeFn(P){
+  const key = P.easeOut + '|' + P.easeIn + '|' + P.overshoot;
+  let f = EASE_CACHE.get(key); if(f) return f;
+  const x1 = clamp(P.easeOut/100, 0, 1), x2 = 1 - clamp(P.easeIn/100, 0, 1), os = P.overshoot;
+  const bx = t => 3*(1 - t)*(1 - t)*t*x1 + 3*(1 - t)*t*t*x2 + t*t*t;
+  const by = t => 3*(1 - t)*t*t + t*t*t;
+  const N = 512, lut = new Float32Array(N + 1);
+  for(let i = 0; i <= N; i++){
+    const x = i/N; let lo = 0, hi = 1;
+    for(let k = 0; k < 32; k++){ const m = (lo + hi)/2; if(bx(m) < x) lo = m; else hi = m; }
+    let y = by((lo + hi)/2);
+    if(os > 0) y += os*Math.sin(Math.PI*y)*y*1.6;
+    lut[i] = y;
+  }
+  lut[0] = 0; lut[N] = 1;
+  f = t => { if(t <= 0) return 0; if(t >= 1) return 1; const u = t*N, i = Math.floor(u); return lut[i] + (lut[i + 1] - lut[i])*(u - i); };
+  if(EASE_CACHE.size > 24) EASE_CACHE.clear();
+  EASE_CACHE.set(key, f); return f;
+}
+/* 0 -> 1 -> 0 envelope on the loop circle: rise, hold, fall, starting at a. */
+function envelope(t, a, up, hold, down, E){
+  const v = wrap1(t - a);
+  if(v < up) return E(v/up);
+  if(v < up + hold) return 1;
+  if(v < up + hold + down) return 1 - E((v - up - hold)/down);
+  return 0;
+}
+
+/* ================= static generation (cached per look) ================= */
+const geomCache = {key:null, val:null};
+const lastStats = {items:0, lanes:0};
+const DIRS = {
+  axis:[[1,0],[0,1],[-1,0],[0,-1]],
+  diag:[[1,0],[0,1],[-1,0],[0,-1],[1,1],[-1,1],[-1,-1],[1,-1]],
+  hex:[[1,0],[0,1],[-1,1],[-1,0],[0,-1],[1,-1]]
+};
+const HALF = {axis:[[1,0],[0,1]], diag:[[1,0],[0,1],[1,1],[1,-1]], hex:[[1,0],[0,1],[-1,1]]};
+function shapeSlot(P, v){
+  const b = P.shareB, c = P.shareC, d = P.shareD;
+  if(v < b) return EL.B; if(v < b + c) return EL.C; if(v < b + c + d) return EL.D; return EL.A;
+}
+function genGrid(L, A){
+  const P = L.params, p = P.pitch, seed = L.seed | 0, hex = P.layout === 'hex';
+  const rot = P.gridRot*Math.PI/180, cr = Math.cos(rot), sr = Math.sin(rot);
+  const e1 = [p, 0], e2 = hex ? [p/2, p*Math.sqrt(3)/2] : [0, p];
+  const gp = [P.finX*A/2, P.finY];
+  // lattice -> local coordinates (relative to the gather point, which is the 3D pivot)
+  const vec = (i, j) => { const lx = i*e1[0] + j*e2[0], ly = i*e1[1] + j*e2[1]; return [lx*cr - ly*sr, lx*sr + ly*cr]; };
+  const D = hex ? DIRS.hex : DIRS[P.dirs] || DIRS.axis, HD = hex ? HALF.hex : HALF[P.dirs] || HALF.axis;
+  const travel = p*(1.5 + Math.min(P.moves, 6)*P.stepSize*0.5 + P.mitoDist);
+  const mx = A/2 + travel, my = 0.5 + travel;
+  const span = Math.min(400, Math.ceil(Math.hypot(mx + Math.abs(gp[0]), my + Math.abs(gp[1]))/(p*(hex ? 0.85 : 1))) + 2);
+  const cells = [], agents = [], index = new Map();
+  for(let j = -span; j <= span; j++) for(let i = -span; i <= span; i++){
+    const [x, y] = vec(i, j);
+    if(Math.abs(x) > mx || Math.abs(y) > my) continue;
+    cells.push([x - gp[0], y - gp[1]]);
+    if(agents.length >= 16000 || hash3(i, j, seed) >= P.occupancy) continue;
+    const id = agents.length, rng = mulberry32((seed*92821 + (i + 1000)*7919 + (j + 1000)*104729) | 0);
+    const ag = {i, j, x:x - gp[0], y:y - gp[1], rr:1 + P.nodeVar*(rng()*2 - 1)*0.6, h:rng(), hg:rng(), acc:rng() < P.accentShare, z:(rng() - 0.5)*2, mv:null, mito:[]};
+    // closed walk on the grid: every step is paid back, so the loop always closes
+    if(P.moves > 0 && rng() < P.moverShare){
+      const k = Math.max(2, 2*Math.round(P.moves/2)), half = k/2, out = [];
+      for(let s = 0; s < half; s++) out.push(D[Math.floor(rng()*D.length)]);
+      let seq;
+      if(rng() < P.reverseShare) seq = [...out, ...out.slice().reverse().map(d => [-d[0], -d[1]])];
+      else {
+        seq = [...out, ...out.map(d => [-d[0], -d[1]])];
+        for(let s = seq.length - 1; s > 0; s--){ const q = Math.floor(rng()*(s + 1)); [seq[s], seq[q]] = [seq[q], seq[s]]; }
+        for(let pass = 0; pass < 4; pass++) for(let s = 0; s < seq.length - 1; s++){
+          if(seq[s][0] === -seq[s + 1][0] && seq[s][1] === -seq[s + 1][1]){ const q = Math.floor(rng()*seq.length); [seq[s + 1], seq[q]] = [seq[q], seq[s + 1]]; }
+        }
+      }
+      const sd = clamp(P.stepDur, 0.02, 1), jit = P.stepJitter;
+      ag.mv = {o0:rng()*jit, D:sd/k, steps:seq.map((d, s) => {
+        const [vx, vy] = vec(d[0]*P.stepSize, d[1]*P.stepSize);
+        return [vx, vy, (s + (0.5*(1 - jit) + rng()*jit)*(1 - sd))/k];
+      })};
+    }
+    // mitosis: a daughter separates into a neighbor cell and fuses back later
+    if(rng() < P.mitoShare){
+      const c = Math.max(1, P.mitoCount | 0), w = 1/c, ph = rng();
+      for(let e = 0; e < c; e++){
+        const sd = Math.min(P.mitoDur, w*0.45);
+        const hold = clamp(w*P.mitoApart*(1 + (rng()*2 - 1)*P.mitoVar), 0, Math.max(0, w - 2*sd));
+        const a = ph + e*w + rng()*Math.max(0, w - hold - 2*sd);
+        const d = D[Math.floor(rng()*D.length)], [vx, vy] = vec(d[0]*P.mitoDist, d[1]*P.mitoDist);
+        ag.mito.push({a, sd, hold, vx, vy});
+      }
+    }
+    index.set(i + ',' + j, id); agents.push(ag);
+  }
+  const bonds = [];
+  if(P.bondShare > 0) for(let id = 0; id < agents.length; id++){
+    const ag = agents[id];
+    for(const d of HD){
+      const nb = index.get((ag.i + d[0]) + ',' + (ag.j + d[1])); if(nb === undefined) continue;
+      if(hash3(ag.i*3 + d[0] + 5000, ag.j*3 + d[1] + 5000, seed + 77) >= P.bondShare) continue;
+      const r = hash3(ag.i + 900, ag.j + 900, seed + d[0]*7 + d[1]*13 + 3);
+      const up = Math.min(P.bondDur, 0.45), hold = clamp(P.bondHold*(0.6 + 0.8*hash3(ag.i, ag.j, seed + 991 + d[0] + d[1]*3)), 0, Math.max(0, 1 - 2*up));
+      bonds.push([id, nb, r, up, hold]);
+    }
+  }
+  return {type:'grid', gp, cells, agents, bonds, rb:P.nodeR*p, Rref:0.5, pitch:p, e1:vec(1, 0), e2:vec(0, 1), span, mx, my};
+}
+
+/* One arm of a radial emblem: a walk on the ring and slot construction grid. */
+function genMotif(P, rng){
+  const rings = Math.max(1, P.rings | 0), len = Math.max(1, P.armLen | 0), nodes = [], seen = new Set();
+  const start = {ring:1 + (rings > 2 && rng() < 0.3 ? 1 : 0), slot:0, parent:-1};
+  nodes.push(start); seen.add(start.ring + ',' + start.slot);
+  for(let n = 1; n < len; n++){
+    const base = (nodes.length > 1 && rng() < P.branch) ? Math.floor(rng()*nodes.length) : nodes.length - 1;
+    const b = nodes[base]; let ok = null;
+    for(let tries = 0; tries < 14 && !ok; tries++){
+      let ring = b.ring, slot = b.slot;
+      if(rings === 1 || rng() < 0.22 + 0.62*Math.abs(P.twist)) slot += rng() < 0.5 + 0.48*P.twist ? 1 : -1;
+      else ring += rng() < 0.72 ? 1 : -1;
+      if(ring < 1 || ring > rings || seen.has(ring + ',' + slot)) continue;
+      ok = {ring, slot, parent:base};
+    }
+    if(!ok) ok = {ring:nodes[nodes.length - 1].ring, slot:nodes[nodes.length - 1].slot, parent:nodes.length - 1, dup:true};
+    seen.add(ok.ring + ',' + ok.slot); nodes.push(ok);
+  }
+  for(const nd of nodes){ nd.z = (rng() - 0.5)*2; nd.v = rng()*2 - 1; nd.h = rng(); }
+  return nodes;
+}
+function genRadial(L, A){
+  const P = L.params, seed = L.seed | 0, cols = Math.max(1, P.emCols | 0), rows = Math.max(1, P.emRows | 0);
+  const sym = Math.max(1, P.sym | 0), sub = Math.max(1, P.subdiv | 0), rings = Math.max(1, P.rings | 0), K = Math.max(1, P.rewire | 0);
+  const ems = [];
+  for(let r = 0; r < rows; r++) for(let c = 0; c < cols; c++){
+    const e = r*cols + c, es = P.emVary ? seed + e*131 : seed;
+    const Rout = P.emSize*Math.min(A/cols, 1/rows)/2;
+    const cg = P.centerGap, rho = [];
+    for(let k = 1; k <= rings; k++) rho.push(rings === 1 ? Rout : Rout*(k - 1 + cg)/(rings - 1 + cg));
+    const dr = rings > 1 ? (rho[rings - 1] - rho[0])/(rings - 1) : Rout*0.6;
+    const dth = TAU*Rout/(sym*sub);
+    const base = P.nodeR*Math.min(dr, dth)*1.05;
+    const rOf = k => Math.min(base*Math.exp(P.sizeByRing*((rings > 1 ? (k - 1)/(rings - 1) : 0.5) - 0.5)*1.4), 0.46*TAU*rho[k - 1]/(sym*sub));
+    const motifs = [];
+    for(let m = 0; m < K; m++) motifs.push(genMotif(P, mulberry32((es*7717 + m*31337 + 11) | 0)));
+    ems.push({type:'radial', e, cx:-A/2 + (c + 0.5)*A/cols, cy:-0.5 + (r + 0.5)/rows, Rout, rho, rOf, rb:base, motifs,
+      Rref:Rout, sym, sub, spinSign:P.emSpinAlt && (r + c) % 2 ? -1 : 1});
+  }
+  return {type:'radial', ems};
+}
+function getGeom(L, A){
+  const key = JSON.stringify(L.params) + '|' + L.seed + '|' + A.toFixed(5);
+  if(geomCache.key === key) return geomCache.val;
+  const v = L.params.layout === 'radial' ? genRadial(L, A) : genGrid(L, A);
+  geomCache.key = key; geomCache.val = v; return v;
+}
+
+/* ================= per-frame node positions ================= */
+function rot2(x, y, a){ const c = Math.cos(a), s = Math.sin(a); return [x*c - y*s, x*s + y*c]; }
+function gridFrame(G, P, t, E){
+  const nodes = [], links = [], agNode = new Int32Array(G.agents.length);
+  for(let id = 0; id < G.agents.length; id++){
+    const ag = G.agents[id];
+    let x = ag.x, y = ag.y;
+    if(ag.mv){
+      const u = wrap1(t - ag.mv.o0), D = ag.mv.D;
+      for(const [vx, vy, st] of ag.mv.steps){ const pr = E(clamp((u - st)/D, 0, 1)); x += vx*pr; y += vy*pr; }
+    }
+    let mx = 0, my = 0, sq = 1;
+    for(const ev of ag.mito){
+      const m = envelope(t, ev.a, ev.sd, ev.hold, ev.sd, E);
+      if(m !== 0){ mx += ev.vx*m; my += ev.vy*m; sq *= 1 - P.mitoSquash*Math.sin(Math.PI*clamp(m, 0, 1)); }
+    }
+    const r = G.rb*ag.rr*sq;
+    agNode[id] = nodes.length;
+    nodes.push({x, y, z:ag.z*P.depth*G.pitch*1.5, r, g:id, h:ag.h, hg:ag.hg, acc:ag.acc, wx:ag.h*13.1, wy:ag.hg*11.7, wa:0});
+    if(mx*mx + my*my > 1e-12) nodes.push({x:x + mx, y:y + my, z:ag.z*P.depth*G.pitch*1.5, r, g:id, h:ag.h, hg:ag.hg, acc:ag.acc, wx:ag.hg*9.3, wy:ag.h*7.1, wa:0});
+  }
+  for(const [a, b, st, up, hold] of G.bonds){
+    const s = clamp(envelope(t, st, up, hold, up, E), 0, 1);
+    if(s > 0.002) links.push([agNode[a], agNode[b], s, 1.8*G.pitch]);
+  }
+  return {nodes, links};
+}
+function radialFrame(em, P, t, E){
+  const K = em.motifs.length, sym = em.sym, sub = em.sub, slotA = TAU/(sym*sub), armOff = P.armOffset*Math.PI/180;
+  const seg = t*K, k = Math.min(K - 1, Math.floor(seg)), fr = seg - k;
+  const md = clamp(P.morphDur, 0.01, 1), e = K > 1 && fr > 1 - md ? E((fr - (1 - md))/md) : 0;
+  const MA = em.motifs[k], MB = em.motifs[(k + 1) % K];
+  // spin in steps of one arm (1/N turn) so the loop closes on an identical image
+  const n = Math.abs(P.spinSteps | 0), sg = Math.sign(P.spinSteps)*em.spinSign;
+  let spin = 0;
+  if(n){
+    if(P.spinStyle === 'smooth') spin = sg*TAU/sym*n*t;
+    else { const tt = t*n, i = Math.floor(tt), f = tt - i, td = clamp(P.tickDur, 0.02, 1); spin = sg*TAU/sym*(i + (f < 1 - td ? 0 : E((f - (1 - td))/td))); }
+  }
+  const shear = P.shear*Math.PI/180*Math.sin(TAU*P.shearCycles*t);
+  const len = MA.length, copies = [];
+  for(let a = 0; a < sym; a++){ copies.push([a, 1]); if(P.mirror) copies.push([a, -1]); }
+  const nodes = [], links = [], depthZ = P.depth*em.Rout*0.45;
+  const polar = (nd, mir) => [mir*(armOff + nd.slot*slotA), em.rho[nd.ring - 1], em.rOf(nd.ring)];
+  for(let ci = 0; ci < copies.length; ci++){
+    const [a, mir] = copies[ci], baseA = a*TAU/sym + spin;
+    for(let q = 0; q < len; q++){
+      const na = MA[q], nb = MB[q];
+      const [ta, ra, sa] = polar(na, mir), [tb, rb, sb] = polar(nb, mir);
+      let dth = tb - ta; dth -= TAU*Math.round(dth/TAU);
+      const ringF = na.ring + (nb.ring - na.ring)*e;
+      const th = baseA + ta + dth*e + shear*Math.cos(Math.PI*(ringF - 1));
+      const rad = ra + (rb - ra)*e, size = (sa + (sb - sa)*e)*(1 + P.nodeVar*0.6*(na.v + (nb.v - na.v)*e));
+      nodes.push({x:Math.cos(th)*rad, y:Math.sin(th)*rad, z:(na.z + (nb.z - na.z)*e)*depthZ*(0.35 + 1.3*rad/em.Rout), r:size, g:ci, h:na.h, hg:(ci + 0.5)/copies.length,
+        acc:na.h < P.accentShare, wx:q*3.7 + 1.1, wy:q*5.3 + 2.9, wa:baseA, wm:mir, ring:ringF});
+    }
+    if(P.chainLinks){
+      const off = ci*len;
+      for(let q = 1; q < len; q++){
+        if(K > 1 && MA[q].parent !== MB[q].parent){
+          if(!MA[q].dup) links.push([off + q, off + MA[q].parent, 1 - e, 0]);
+          if(!MB[q].dup) links.push([off + q, off + MB[q].parent, e, 0]);
+        } else if(!MA[q].dup || (K > 1 && !MB[q].dup)) links.push([off + q, off + MA[q].parent, 1, 0]);
+      }
+    }
+  }
+  if(P.centerDot) nodes.push({x:0, y:0, z:0, r:em.rb*1.25*Math.exp(-P.sizeByRing*0.35), g:-1, h:0.5, hg:0, acc:false, wx:0.3, wy:0.7, wa:0, center:true});
+  return {nodes, links, spin};
+}
+
+/* ================= gather into a dot ================= */
+function finaleState(P, t){
+  const Pg = P.finPortion, H = P.finHold, B = P.finBurst;
+  switch(P.finMode){
+    case 'loop': {
+      if(t >= 1 - H) return {kind:'hold', u:1};
+      if(t >= 1 - H - Pg) return {kind:'gather', u:(t - (1 - H - Pg))/Pg};
+      if(t < B) return {kind:'burst', u:t/B};
+      return null;
+    }
+    case 'end': {
+      if(t >= 1 - H) return {kind:'hold', u:H > 0 ? (t - (1 - H))/H : 1, shrink:true};
+      if(t >= 1 - H - Pg) return {kind:'gather', u:(t - (1 - H - Pg))/Pg};
+      return null;
+    }
+    case 'start': {
+      if(t < H) return {kind:'hold', u:1};
+      if(t < H + B) return {kind:'burst', u:(t - H)/B};
+      return null;
+    }
+  }
+  return null;
+}
+
+/* ================= 3D ================= */
+function mat3(P, em, t, extraTurn){
+  const al = P.tiltX*Math.PI/180, ph = P.turnAxis*Math.PI/180;
+  const off = em.count > 1 ? TAU*P.turnOffset*em.e : 0;
+  let be;
+  if(P.threeMode === 'off') be = 0;
+  else if(P.turnMode === 'spin') be = TAU*(P.turnCycles | 0)*t + off;
+  else be = (P.turnCycles | 0) ? P.turnAmt*Math.PI/180*Math.sin(TAU*(P.turnCycles | 0)*t + off) : P.turnAmt*Math.PI/180;
+  be += extraTurn;
+  const ux = Math.sin(ph), uy = Math.cos(ph), c = Math.cos(be), s = Math.sin(be), C = 1 - c;
+  const Ra = [[c + ux*ux*C, ux*uy*C, uy*s], [ux*uy*C, c + uy*uy*C, -ux*s], [-uy*s, ux*s, c]];
+  const ca = Math.cos(P.threeMode === 'off' ? 0 : al), sa = Math.sin(P.threeMode === 'off' ? 0 : al);
+  const Rx = [[1, 0, 0], [0, ca, -sa], [0, sa, ca]];
+  const M = [[0,0,0],[0,0,0],[0,0,0]];
+  for(let i = 0; i < 3; i++) for(let j = 0; j < 3; j++) M[i][j] = Rx[i][0]*Ra[0][j] + Rx[i][1]*Ra[1][j] + Rx[i][2]*Ra[2][j];
+  return M;
+}
+
+/* ================= fillet bridges (constructed metaball necks) ================= */
+function bridgeOf(a, b, rf){
+  const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+  if(d < 1e-9 || d <= Math.abs(a.r - b.r) + 1e-9 || rf <= 0) return null;
+  const A1 = a.r + rf, B1 = b.r + rf, x = (A1*A1 - B1*B1 + d*d)/(2*d), h2 = A1*A1 - x*x;
+  if(h2 <= 0 || x <= 0 || x >= d) return null;
+  const h = Math.sqrt(h2); if(h <= rf) return null;
+  const ux = dx/d, uy = dy/d, nx = -uy, ny = ux, bx = a.x + ux*x, by = a.y + uy*x;
+  return {a, b, rf, h, A1, B1, nx, ny, f1x:bx + nx*h, f1y:by + ny*h, f2x:bx - nx*h, f2y:by - ny*h};
+}
+function rfForNeck(a, b, n){
+  const d = Math.hypot(b.x - a.x, b.y - a.y); if(d < 1e-9) return 0;
+  const hOf = rf => { const A1 = a.r + rf, B1 = b.r + rf, x = (A1*A1 - B1*B1 + d*d)/(2*d), h2 = A1*A1 - x*x; return h2 > 0 ? Math.sqrt(h2) - rf : -1; };
+  let lo = 0, hi = Math.max(a.r, b.r)*2.5 + d*0.5;
+  if(hOf(hi) < n) return hi;
+  for(let k = 0; k < 26; k++){ const m = (lo + hi)/2; if(hOf(m) < n) lo = m; else hi = m; }
+  return hi;
+}
+function arcVia(p, cx, cy, r, a0, a1, am){
+  // the fillet arc between the two tangent points is always the minor arc
+  const sw = wrap1((a1 - a0)/TAU)*TAU;
+  p.arc(cx, cy, r, a0, a1, sw > Math.PI);
+}
+function addCircle(p, n, w){ const r = n.r + w; if(r <= 1e-7) return; p.moveTo(n.x + r, n.y); p.arc(n.x, n.y, r, 0, TAU); }
+function addBridge(p, B, w){
+  const a = B.a, b = B.b, ra = a.r + w, rb = b.r + w, rf = B.rf - w;
+  if(ra <= 1e-7 || rb <= 1e-7 || rf >= B.h) return;
+  if(rf <= 1e-7){
+    const pts = [[a.x, a.y], [B.f1x, B.f1y], [b.x, b.y], [B.f2x, B.f2y]];
+    let ar = 0; for(let i = 0; i < 4; i++){ const [x0, y0] = pts[i], [x1, y1] = pts[(i + 1) % 4]; ar += x0*y1 - x1*y0; }
+    if(ar < 0) pts.reverse();
+    p.moveTo(pts[0][0], pts[0][1]); for(let i = 1; i < 4; i++) p.lineTo(pts[i][0], pts[i][1]); p.closePath(); return;
+  }
+  const ka = ra/B.A1, kb = rb/B.B1;
+  const t1a = [a.x + (B.f1x - a.x)*ka, a.y + (B.f1y - a.y)*ka], t2a = [b.x + (B.f1x - b.x)*kb, b.y + (B.f1y - b.y)*kb];
+  const t1b = [a.x + (B.f2x - a.x)*ka, a.y + (B.f2y - a.y)*ka], t2b = [b.x + (B.f2x - b.x)*kb, b.y + (B.f2y - b.y)*kb];
+  const q = [t1a, t2a, t2b, t1b];
+  let ar = 0; for(let i = 0; i < 4; i++){ const [x0, y0] = q[i], [x1, y1] = q[(i + 1) % 4]; ar += x0*y1 - x1*y0; }
+  const ang = (pt, fx, fy) => Math.atan2(pt[1] - fy, pt[0] - fx);
+  const am1 = Math.atan2(-B.ny, -B.nx), am2 = Math.atan2(B.ny, B.nx);
+  if(ar >= 0){
+    p.moveTo(t1a[0], t1a[1]);
+    arcVia(p, B.f1x, B.f1y, rf, ang(t1a, B.f1x, B.f1y), ang(t2a, B.f1x, B.f1y), am1);
+    p.lineTo(t2b[0], t2b[1]);
+    arcVia(p, B.f2x, B.f2y, rf, ang(t2b, B.f2x, B.f2y), ang(t1b, B.f2x, B.f2y), am2);
+  } else {
+    p.moveTo(t1b[0], t1b[1]);
+    arcVia(p, B.f2x, B.f2y, rf, ang(t1b, B.f2x, B.f2y), ang(t2b, B.f2x, B.f2y), am2);
+    p.lineTo(t2a[0], t2a[1]);
+    arcVia(p, B.f1x, B.f1y, rf, ang(t2a, B.f1x, B.f1y), ang(t1a, B.f1x, B.f1y), am1);
+  }
+  p.closePath();
+}
+
+/* ================= ramp ================= */
+function rampRGB(L){
+  const P = L.params;
+  let nums = String(P.ramp || '').split(/[^0-9]+/).map(Number).filter(v => v >= 1 && v <= 7);
+  if(!nums.length) nums = [1, 7];
+  const cols = nums.map(v => hexRgb(L.palette[v - 1]));
+  if(P.rampCyclic) cols.push(cols[0]);
+  const m = cols.length - 1, lut = new Array(256);
+  for(let t = 0; t < 256; t++){
+    if(m <= 0){ lut[t] = cols[0]; continue; }
+    const f = t/255*m;
+    if(!P.rampSmooth) lut[t] = cols[Math.min(m, Math.round(f))];
+    else { const i = Math.min(m - 1, Math.floor(f)), fr = f - i; lut[t] = [0, 1, 2].map(q => cols[i][q] + (cols[i + 1][q] - cols[i][q])*fr); }
+  }
+  return {lut, cyc:!!P.rampCyclic};
+}
+const mixRGB = (a, b, t) => [a[0] + (b[0] - a[0])*t, a[1] + (b[1] - a[1])*t, a[2] + (b[2] - a[2])*t];
+const rgbStr = c => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+
+/* ================= scene ================= */
+let layerC = null;
+function getLayer(w, hgt){
+  if(!layerC || layerC.width !== w || layerC.height !== hgt){ layerC = makeCanvas(w, hgt); }
+  const x = layerC.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.clearRect(0, 0, w, hgt);
+  return x;
+}
+function buildFrame(L, A, frm){
+  const P = L.params, E = easeFn(P), EP = effectiveP(L);
+  const total = totalFramesOf(L), t = (frm % total)/total;
+  const G = getGeom(L, A);
+  const fin = finaleState(P, t);
+  const ems = [];
+  if(G.type === 'grid'){
+    const f = gridFrame(G, P, t, E);
+    ems.push({e:0, count:1, cx:G.gp[0], cy:G.gp[1], rb:G.rb, Rref:G.Rref, nodes:f.nodes, links:f.links, spin:0, grid:G});
+  } else {
+    for(const em of G.ems){
+      const f = radialFrame(em, P, t, E);
+      ems.push({e:em.e, count:G.ems.length, cx:em.cx, cy:em.cy, rb:em.rb, Rref:em.Rref, nodes:f.nodes, links:f.links, spin:f.spin, rad:em});
+    }
+  }
+  const LC = L.motion.loop ? [Math.cos(TAU*t)*EP.wanderSpeed, Math.sin(TAU*t)*EP.wanderSpeed] : [t*TAU*EP.wanderSpeed, t*TAU*EP.wanderSpeed*0.93];
+  const g = P.gOn ? gradCtx(L, t, A) : null;
+  const so = seedOff(L.seed + 3);
+  for(const em of ems){
+    // finale progress (global and per node)
+    let Gp = 0, rDot = P.finDot*em.rb, shrink = 1;
+    let maxD = 1e-9; for(const n of em.nodes) maxD = Math.max(maxD, Math.hypot(n.x, n.y));
+    if(fin){
+      if(fin.kind === 'hold'){ Gp = 1; if(fin.shrink && P.finShrink) shrink = 1 - E(fin.u); }
+      else Gp = E(fin.kind === 'gather' ? fin.u : 1 - fin.u);
+    }
+    for(const n of em.nodes){
+      // breathing
+      if(P.breathe > 0){
+        const ph = P.breathMode === 'wave' ? (n.x + em.cx)*0.9 + (n.y + em.cy)*0.5 : P.breathMode === 'radial' ? Math.hypot(n.x, n.y)*2.5 : n.h;
+        n.r *= 1 + P.breathe*Math.sin(TAU*(EP.breathCycles*t - ph));
+      }
+      // wander (rotated with the arm so emblems stay symmetric)
+      if(P.wander > 0){
+        let wx = lnoise(n.wx + so[0], so[1], 0, LC), wy = lnoise(so[0] + 3.1, n.wy + so[1], 0, LC);
+        if(n.wm === -1) wy = -wy;
+        if(n.wa){ [wx, wy] = rot2(wx, wy, n.wa); }
+        n.x += wx*P.wander*em.rb*1.2; n.y += wy*P.wander*em.rb*1.2;
+      }
+      n.gm = 1; n.gv = 0.5;
+      if(g){
+        const v = gradValue(n.x + em.cx, n.y + em.cy, g); n.gv = v;
+        n.r *= Math.max(0, 1 + P.tSize*(2*v - 1));
+        if(P.tVis){ const vv = P.tVis > 0 ? v : 1 - v; n.r *= mix(1, smooth(P.thresh - P.threshSoft, P.thresh + P.threshSoft, vv), Math.abs(P.tVis)); }
+        n.gm = Math.max(0, 1 + P.tGoo*(2*v - 1));
+      }
+      // gather into the dot
+      if(fin){
+        let gi;
+        if(fin.kind === 'hold') gi = 1;
+        else {
+          const q = Math.hypot(n.x, n.y)/maxD, st = P.finStagger;
+          const u = fin.kind === 'gather' ? fin.u : 1 - fin.u;
+          gi = E(clamp((u - q*st)/Math.max(1e-6, 1 - st), 0, 1));
+        }
+        if(gi > 0){
+          const [rx, ry] = rot2(n.x*(1 - gi), n.y*(1 - gi), P.finSwirl*TAU*gi);
+          n.x = rx; n.y = ry; n.z *= 1 - gi; n.r = mix(n.r, rDot, gi);
+        }
+        n.r *= shrink;
+      }
+    }
+    // 3D
+    const extra = P.finTurn*Math.PI/180*Gp;
+    let mode = P.threeMode;
+    if(mode === 'off' && extra > 0) mode = 'spheres';
+    em.mode = mode;
+    if(mode !== 'off'){
+      const M = mat3(P, em, t, extra); em.M = M;
+      if(mode === 'flat') em.aff = [M[0][0], M[1][0], M[0][1], M[1][1]];
+      else {
+        const Dz = 3*em.Rref, pz = P.persp;
+        em.proj = (x, y, z) => {
+          const X = M[0][0]*x + M[0][1]*y + M[0][2]*z, Y = M[1][0]*x + M[1][1]*y + M[1][2]*z, Z = M[2][0]*x + M[2][1]*y + M[2][2]*z;
+          const s = 1/Math.max(0.25, 1 - pz*Z/Dz);
+          return [X*s, Y*s, Z, s];
+        };
+        const zs = Math.max(1e-6, em.Rref*0.9);
+        for(const n of em.nodes){
+          const [X, Y, Z, s] = em.proj(n.x, n.y, n.z); n.x = X; n.y = Y; n.zz = Z; n.r *= s;
+          n.back = clamp(0.5 - Z/(2*zs), 0, 1);
+        }
+      }
+    }
+  }
+  return {ems, t, fin};
+}
+
+function drawScene(ctx, W, H, ox, oy, frm, L){
+  const A = W/H, P = L.params, EP = effectiveP(L);
+  const col = k => L.palette[clamp(L.idx[k] | 0, 0, 6)], op = k => L.op[k];
+  const cw = ctx.canvas.width, chh = ctx.canvas.height;
+  const F = buildFrame(L, A, frm), t = F.t;
+  const so = seedOff(L.seed + 41), LCr = [Math.cos(TAU*t)*0.3, Math.sin(TAU*t)*0.3];
+
+  // background
+  ctx.setTransform(1, 0, 0, 1, -ox, -oy); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  if(P.bgType === 'linear'){
+    const a = P.bgAngle*Math.PI/180, ca = Math.cos(a), sa = Math.sin(a), hl = Math.max(1, (Math.abs(W*ca) + Math.abs(H*sa))/2*P.bgSpread);
+    const gr = ctx.createLinearGradient(W/2 - ca*hl, H/2 - sa*hl, W/2 + ca*hl, H/2 + sa*hl); gr.addColorStop(0, col(0)); gr.addColorStop(1, col(1)); ctx.fillStyle = gr;
+  } else if(P.bgType === 'radial'){
+    const gr = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(1, Math.hypot(W, H)/2*P.bgSpread)); gr.addColorStop(0, col(0)); gr.addColorStop(1, col(1)); ctx.fillStyle = gr;
+  } else ctx.fillStyle = col(0);
+  ctx.fillRect(ox, oy, cw, chh);
+
+  const setEm = (c, em) => {
+    c.setTransform(H, 0, 0, H, W/2 - ox, H/2 - oy); c.translate(em.cx, em.cy);
+    if(em.aff) c.transform(em.aff[0], em.aff[1], em.aff[2], em.aff[3], 0, 0);
+  };
+  const ident = (x, y, z) => [x, y, z, 1];
+
+  // colors per node
+  const bgRGB = hexRgb(col(0)), ramp = P.colorMode === 'ramp' ? rampRGB(L) : null;
+  const ra = P.rampAngle*Math.PI/180, rca = Math.cos(ra), rsa = Math.sin(ra);
+  const rampAt = v => {
+    v = (v - 0.5)*P.rampContrast + 0.5 + P.rampOffset + t*EP.drift;
+    if(ramp.cyc) v -= Math.floor(v);
+    else if(EP.drift){ v -= 2*Math.floor(v/2); if(v > 1) v = 2 - v; }
+    return ramp.lut[Math.round(clamp(v, 0, 1)*255)];
+  };
+  let nodeCount = 0, bridgeCount = 0;
+  for(const em of F.ems){
+    for(const n of em.nodes){
+      let c;
+      if(n.acc && P.accentShare > 0) c = hexRgb(col(EL.accent));
+      else switch(P.colorMode){
+        case 'group': c = hexRgb(col(n.center ? EL.A : shapeSlot(P, n.hg))); break;
+        case 'random': c = hexRgb(col(shapeSlot(P, n.h))); break;
+        case 'ramp': {
+          const wx = n.x + em.cx, wy = n.y + em.cy; let v;
+          if(P.rampSrc === 'axis') v = (wx*rca + wy*rsa)/Math.max(0.2, Math.abs(A*rca) + Math.abs(rsa)) + 0.5;
+          else if(P.rampSrc === 'radial') v = Math.hypot(n.x, n.y)/Math.max(0.05, em.Rref*(em.grid ? 1.2 : 1.1));
+          else if(P.rampSrc === 'noise') v = 0.5 + 0.6*fbm(wx*P.rampScale + so[0], wy*P.rampScale + so[1], 0, 2, 0, LCr);
+          else v = n.h;
+          c = rampAt(v + P.tColor*(n.gv - 0.5)); break;
+        }
+        default: c = hexRgb(col(EL.A));
+      }
+      if(P.edgeFade > 0){
+        const wx = n.x + em.cx, wy = n.y + em.cy, de = Math.min(A/2 - Math.abs(wx), 0.5 - Math.abs(wy));
+        c = mixRGB(c, bgRGB, P.edgeFade*(1 - smooth(0, P.edgeWidth, de)));
+      }
+      if(n.back !== undefined && P.depthFade > 0) c = mixRGB(c, bgRGB, P.depthFade*n.back);
+      n.c = rgbStr(c);
+      n.out = P.fillMode === 'outline' || (P.fillMode === 'mixed' && hash3((n.g + 100) | 0, 3, L.seed) < P.outlineShare);
+      if(P.polarity === 'neg') n.out = false;
+    }
+    const nodes = em.nodes.filter(n => n.r > em.rb*0.004);
+    em.draw = nodes; nodeCount += nodes.length;
+    // bridges: proximity fusion plus explicit bonds
+    const pairs = new Map(), N = em.nodes.length;
+    for(const [a, b, s, maxD] of em.links){
+      const na = em.nodes[a], nb = em.nodes[b];
+      if(!na || !nb || na.r <= em.rb*0.004 || nb.r <= em.rb*0.004 || na.out !== nb.out) continue;
+      const d = Math.hypot(nb.x - na.x, nb.y - na.y);
+      let ss = s; if(maxD) ss *= 1 - smooth(maxD*0.8, maxD, d);
+      if(ss <= 0.002) continue;
+      const rf = rfForNeck(na, nb, ss*P.neck*Math.min(na.r, nb.r)*0.96);
+      const key = Math.min(a, b)*N + Math.max(a, b);
+      pairs.set(key, Math.max(pairs.get(key) || 0, rf));
+    }
+    if(P.goo > 0.001 && nodes.length){
+      let rmax = 0; for(const n of nodes) rmax = Math.max(rmax, n.r);
+      const rfMax = P.goo*rmax*Math.max(1, 1 + Math.abs(P.tGoo)), cs = 2*(rmax + rfMax) + 1e-6;
+      const grid = new Map(), keyOf = (i, j) => (i + 32768)*65536 + (j + 32768);
+      const idxOf = new Map(); em.nodes.forEach((n, i) => idxOf.set(n, i));
+      for(const n of nodes){ const k = keyOf(Math.floor(n.x/cs), Math.floor(n.y/cs)); let b = grid.get(k); if(!b) grid.set(k, b = []); b.push(n); }
+      for(const n of nodes){
+        const ia = idxOf.get(n), gi = Math.floor(n.x/cs), gj = Math.floor(n.y/cs);
+        for(let dj = -1; dj <= 1; dj++) for(let di = -1; di <= 1; di++){
+          const b = grid.get(keyOf(gi + di, gj + dj)); if(!b) continue;
+          for(const m of b){
+            const ib = idxOf.get(m); if(ib <= ia || m.out !== n.out) continue;
+            const rf = P.goo*0.5*(n.r + m.r)*0.5*(n.gm + m.gm);
+            const d = Math.hypot(m.x - n.x, m.y - n.y); if(d > n.r + m.r + 2*rf) continue;
+            const key = ia*N + ib; pairs.set(key, Math.max(pairs.get(key) || 0, rf));
+          }
+        }
+      }
+    }
+    em.bridges = [];
+    for(const [key, rf] of pairs){
+      const a = em.nodes[Math.floor(key/N)], b = em.nodes[key % N];
+      const B = bridgeOf(a, b, rf); if(B) em.bridges.push(B);
+    }
+    bridgeCount += em.bridges.length;
+  }
+
+  // ghost grid and construction lines (behind the shapes)
+  const ghostOn = P.ghost && op(EL.ghost) > 0, conOn = P.constr && op(EL.constr) > 0;
+  if(ghostOn || conOn) for(const em of F.ems){
+    setEm(ctx, em);
+    const pj = em.proj || ident;
+    if(conOn){
+      ctx.globalAlpha = op(EL.constr); ctx.strokeStyle = col(EL.constr); ctx.lineWidth = P.constrW; ctx.beginPath();
+      const seg = (x0, y0, x1, y1) => { const a = pj(x0, y0, 0), b = pj(x1, y1, 0); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); };
+      if(em.rad){
+        const R = em.rad, all = [...R.rho, R.Rout*1.22];
+        for(const rr of all){ for(let k = 0; k <= 96; k++){ const th = TAU*k/96, q = pj(Math.cos(th)*rr, Math.sin(th)*rr, 0); k ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); } }
+        const ns = R.sym*R.sub, a0 = P.armOffset*Math.PI/180 + em.spin;
+        for(let s = 0; s < ns; s++){ const th = a0 + TAU*s/ns; seg(Math.cos(th)*R.rho[0]*0.35, Math.sin(th)*R.rho[0]*0.35, Math.cos(th)*R.Rout*1.22, Math.sin(th)*R.Rout*1.22); }
+        seg(-R.Rout*1.4, 0, R.Rout*1.4, 0); seg(0, -R.Rout*1.4, 0, R.Rout*1.4);
+      } else {
+        const Gd = em.grid, S = Gd.span, ext = Math.hypot(Gd.mx, Gd.my)*1.2;
+        for(const [e, f] of [[Gd.e1, Gd.e2], [Gd.e2, Gd.e1]]){
+          const le = Math.hypot(e[0], e[1]) || 1, ux = e[0]/le, uy = e[1]/le;
+          for(let k = -S; k <= S; k++){
+            const bx = f[0]*k - em.cx, by = f[1]*k - em.cy;
+            if(Math.abs(bx*uy - by*ux) > ext) continue;
+            seg(bx - ux*ext, by - uy*ext, bx + ux*ext, by + uy*ext);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+    if(ghostOn){
+      ctx.globalAlpha = op(EL.ghost); ctx.strokeStyle = col(EL.ghost); ctx.lineWidth = P.ghostW*em.rb; ctx.beginPath();
+      const ring = (x, y, r) => { const q = pj(x, y, 0); const rr = r*q[3]; ctx.moveTo(q[0] + rr, q[1]); ctx.arc(q[0], q[1], rr, 0, TAU); };
+      if(em.rad){
+        const R = em.rad, ns = R.sym*R.sub, a0 = P.armOffset*Math.PI/180 + em.spin;
+        R.rho.forEach((rr, k) => { for(let s = 0; s < ns; s++){ const th = a0 + TAU*s/ns; ring(Math.cos(th)*rr, Math.sin(th)*rr, R.rOf(k + 1)); } });
+      } else for(const [x, y] of em.grid.cells) ring(x, y, em.rb);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const unionPath = (em, w, filt) => {
+    const p = new Path2D();
+    for(const n of em.draw) if(!filt || filt(n)) addCircle(p, n, w);
+    for(const B of em.bridges) if(!filt || filt(B.a)) addBridge(p, B, w);
+    return p;
+  };
+  /* Colored draw: one path when everything shares a color, otherwise bridges with gradients and circles grouped by color (depth sorted in 3D). */
+  const drawColored = (c, em, w, filt) => {
+    const nodes = filt ? em.draw.filter(filt) : em.draw, brs = filt ? em.bridges.filter(B => filt(B.a)) : em.bridges;
+    if(!nodes.length) return;
+    const c0 = nodes[0].c;
+    if(nodes.every(n => n.c === c0)){ const p = new Path2D(); for(const n of nodes) addCircle(p, n, w); for(const B of brs) addBridge(p, B, w); c.fillStyle = c0; c.fill(p); return; }
+    const bfill = B => {
+      if(B.a.c === B.b.c) return B.a.c;
+      const gr = c.createLinearGradient(B.a.x, B.a.y, B.b.x, B.b.y);
+      if(P.bridgeBlend){ gr.addColorStop(0, B.a.c); gr.addColorStop(1, B.b.c); }
+      else { gr.addColorStop(0, B.a.c); gr.addColorStop(0.5, B.a.c); gr.addColorStop(0.5, B.b.c); gr.addColorStop(1, B.b.c); }
+      return gr;
+    };
+    if(em.proj){
+      const items = nodes.map(n => [n.zz || 0, n, null]);
+      for(const B of brs) items.push([((B.a.zz || 0) + (B.b.zz || 0))/2 - 1e-6, null, B]);
+      items.sort((x, y) => x[0] - y[0]);
+      for(const [, n, B] of items){
+        const p = new Path2D();
+        if(n){ addCircle(p, n, w); c.fillStyle = n.c; } else { addBridge(p, B, w); c.fillStyle = bfill(B); }
+        c.fill(p);
+      }
+      return;
+    }
+    for(const B of brs){ const p = new Path2D(); addBridge(p, B, w); c.fillStyle = bfill(B); c.fill(p); }
+    const byCol = new Map();
+    for(const n of nodes){ let p = byCol.get(n.c); if(!p) byCol.set(n.c, p = new Path2D()); addCircle(p, n, w); }
+    for(const [cc, p] of byCol){ c.fillStyle = cc; c.fill(p); }
+  };
+
+  // keyline
+  if(P.keyline && op(EL.key) > 0 && P.polarity !== 'neg'){
+    ctx.globalAlpha = op(EL.key); ctx.fillStyle = col(EL.key);
+    for(const em of F.ems){ setEm(ctx, em); ctx.fill(unionPath(em, P.keyW*em.rb, n => !n.out)); }
+    ctx.globalAlpha = 1;
+  }
+  const composite = (lx, alpha) => { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = alpha; ctx.drawImage(lx.canvas, 0, 0); ctx.globalAlpha = 1; };
+  if(P.polarity === 'neg'){
+    const lx = getLayer(cw, chh);
+    lx.fillStyle = col(EL.A); lx.fillRect(0, 0, cw, chh);
+    lx.globalCompositeOperation = 'destination-out';
+    for(const em of F.ems){ setEm(lx, em); lx.fill(unionPath(em, 0)); }
+    composite(lx, op(EL.A));
+  } else {
+    const anyFill = F.ems.some(em => em.draw.some(n => !n.out)), anyOut = F.ems.some(em => em.draw.some(n => n.out));
+    if(anyFill){
+      if(op(EL.A) < 1){ const lx = getLayer(cw, chh); for(const em of F.ems){ setEm(lx, em); drawColored(lx, em, 0, n => !n.out); } composite(lx, op(EL.A)); }
+      else for(const em of F.ems){ setEm(ctx, em); drawColored(ctx, em, 0, n => !n.out); }
+    }
+    if(anyOut){
+      const lx = getLayer(cw, chh);
+      for(const em of F.ems){ setEm(lx, em); drawColored(lx, em, P.strokeW*em.rb/2, n => n.out); }
+      lx.globalCompositeOperation = 'destination-out'; lx.fillStyle = '#000';
+      for(const em of F.ems){ setEm(lx, em); lx.fill(unionPath(em, -P.strokeW*em.rb/2, n => n.out)); }
+      composite(lx, op(EL.A));
+    }
+  }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  lastStats.items = nodeCount; lastStats.lanes = bridgeCount;
+
+  // finishing
+  if(P.vigOn && P.vig > 0){
+    ctx.setTransform(1, 0, 0, 1, -ox, -oy);
+    const rr = Math.hypot(W, H)/2, gr = ctx.createRadialGradient(W/2, H/2, rr*0.35, W/2, H/2, rr);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, `rgba(0,0,0,${P.vig})`);
+    ctx.fillStyle = gr; ctx.fillRect(ox, oy, cw, chh);
+  }
+  if(P.scanOn && P.scanAmt > 0){
+    const sz = Math.max(2, Math.round(P.scanSize*H/1080));
+    ctx.setTransform(1, 0, 0, 1, -ox, -oy);
+    ctx.globalAlpha = P.scanAmt; ctx.fillStyle = ctx.createPattern(scanTile(P.scanType, sz, col(EL.scan)), 'repeat');
+    ctx.fillRect(ox, oy, cw, chh); ctx.globalAlpha = 1;
+  }
+  if(P.dustOn && P.dust > 0){
+    ctx.setTransform(1, 0, 0, 1, -ox, -oy);
+    const r = mulberry32(frm*15731 + L.seed*31 + 7), n = Math.min(3000, Math.round(P.dust*40*(W*H)/(1920*1080))), sc = H/1080*P.dustSize;
+    ctx.fillStyle = ctx.strokeStyle = col(EL.dust); ctx.lineCap = 'round';
+    for(let i = 0; i < n; i++){
+      const x = r()*W, y = r()*H, kind = r(), al = r(), sz = r(), ang = r()*TAU, bend = r() - 0.5;
+      ctx.globalAlpha = op(EL.dust)*(0.3 + 0.7*al);
+      if(kind < 0.85){ ctx.beginPath(); ctx.arc(x, y, Math.max(0.4, sc*(0.4 + sz*1.4)), 0, TAU); ctx.fill(); }
+      else {
+        const len = sc*(10 + sz*40), ex = x + Math.cos(ang)*len, ey = y + Math.sin(ang)*len;
+        ctx.lineWidth = Math.max(0.5, sc*0.5); ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.quadraticCurveTo((x + ex)/2 - Math.sin(ang)*len*bend, (y + ey)/2 + Math.cos(ang)*len*bend, ex, ey); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  if(P.grainOn && P.grain > 0){
+    const gs = Math.max(1, P.grainSize);
+    ctx.setTransform(gs, 0, 0, gs, -ox, -oy);
+    ctx.globalCompositeOperation = 'overlay'; ctx.globalAlpha = P.grain*0.6;
+    ctx.fillStyle = ctx.createPattern(grainCanvas(frm), 'repeat');
+    ctx.fillRect(ox/gs, oy/gs, cw/gs, chh/gs);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  }
+}
+
+/* ================= UI widgets ================= */
+function numField({get, set, min, max, step, int, dec, dragUnit}){
+  const el = h('input', {class:'num', type:'text', inputmode:'decimal', spellcheck:'false'});
+  const dp = dec ?? (step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : step >= 0.001 ? 3 : 4);
+  const fmt = v => int ? String(Math.round(v)) : (+v).toFixed(dp);
+  const clampV = v => { v = Math.min(max, Math.max(min, v)); return int ? Math.round(v) : v; };
+  const unit = dragUnit ?? (int ? Math.max(step, 1)*0.25 : step);
+  let drag = null;
+  el.addEventListener('pointerdown', e => { if(document.activeElement === el) return; e.preventDefault(); drag = {x:e.clientX, v:get(), moved:false}; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', e => {
+    if(!drag) return; const dx = e.clientX - drag.x;
+    if(Math.abs(dx) > 2) drag.moved = true; if(!drag.moved) return;
+    const mul = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
+    set(clampV(drag.v + dx*unit*mul)); el.value = fmt(get());
+  });
+  el.addEventListener('pointerup', () => { if(!drag) return; const m = drag.moved; drag = null; if(!m){ el.focus(); el.select(); } });
+  const commit = () => { const v = parseFloat(String(el.value).replace(',', '.')); if(!isNaN(v)) set(clampV(v)); el.value = fmt(get()); };
+  el.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ commit(); el.blur(); }
+    else if(e.key === 'Escape'){ el.value = fmt(get()); el.blur(); }
+    else if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); const st = (e.shiftKey ? 10 : 1)*(int ? 1 : step); set(clampV(get() + (e.key === 'ArrowUp' ? st : -st))); el.value = fmt(get()); }
+  });
+  el.addEventListener('blur', commit);
+  el.sync = () => { if(document.activeElement !== el) el.value = fmt(get()); };
+  el.sync();
+  return el;
+}
+function lockBtn(key){
+  const b = h('button', {class:'lock', type:'button', title:'Lock: Randomize and Variations leave this value alone', onclick:() => { locks.has(key) ? locks.delete(key) : locks.add(key); syncL(); scheduleSave(); }}, lockSvg());
+  const syncL = () => { const on = locks.has(key); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); };
+  reg(syncL); return b;
+}
+let afterParam = () => {};
+function paramRow(d){
+  const get = () => look.params[d.k];
+  const lab = h('span', {class:'lab', text:d.l, title:d.l});
+  const rng = h('input', {type:'range', min:d.min, max:d.max, step:d.step, 'aria-label':d.l});
+  const num = numField({get, set:v => { look.params[d.k] = v; rng.value = v; changed(); afterParam(); }, min:d.min, max:d.max, step:d.step, int:d.int, dragUnit:d.drag});
+  rng.addEventListener('input', () => { look.params[d.k] = +rng.value; num.sync(); changed(); afterParam(); });
+  reg(() => { rng.value = get(); num.sync(); });
+  return d.rnd ? h('div', {class:'row'}, lockBtn(d.k), lab, rng, num) : h('div', {class:'row nolock'}, lab, rng, num);
+}
+function toggle(label, get, set, main){
+  const inp = h('input', {type:'checkbox'});
+  inp.addEventListener('change', () => { set(inp.checked); changed(); syncAll(); });
+  reg(() => { inp.checked = !!get(); });
+  return h('label', {class:'switch' + (main ? ' main-t' : '')}, inp, h('span', {class:'track'}), h('span', {text:label}));
+}
+function widget(d){
+  if(d.t === 'num') return paramRow(d);
+  if(d.t === 'toggle') return toggle(d.l, () => look.params[d.k], v => look.params[d.k] = v, d.main);
+  if(d.t === 'select'){
+    const sel = h('select', {class:'wide', 'aria-label':d.l}, ...d.o.map(([v, l]) => h('option', {value:v, text:l})));
+    sel.addEventListener('change', () => { look.params[d.k] = sel.value; changed(); syncAll(); });
+    reg(() => { sel.value = look.params[d.k]; });
+    return h('div', {class:'row nolock'}, h('span', {class:'lab', text:d.l}), sel);
+  }
+  if(d.t === 'textarea'){
+    const ta = h('textarea', {class:'txt', rows:'6', spellcheck:'false'});
+    ta.addEventListener('input', () => { look.params[d.k] = ta.value; changed(); });
+    reg(() => { if(document.activeElement !== ta) ta.value = look.params[d.k]; });
+    return h('label', {class:'field'}, h('span', {text:d.l}), ta);
+  }
+  const inp = h('input', {class:'txt', type:'text', spellcheck:'false'});
+  inp.addEventListener('change', () => { look.params[d.k] = inp.value; changed(); });
+  reg(() => { if(document.activeElement !== inp) inp.value = look.params[d.k]; });
+  return h('label', {class:'field'}, h('span', {text:d.l}), inp);
+}
+const widgets = s => DEFS.filter(d => d.s === s).map(widget);
+function section(title, open, ...kids){ return h('details', {class:'sec', open:open ? '' : null}, h('summary', {text:title}), h('div', {class:'sec-body'}, ...kids)); }
+function imageLoader(label, key, maxDim){
+  const fi = h('input', {type:'file', accept:'image/png,image/svg+xml,image/jpeg,image/webp', style:'display:none'});
+  const prev = h('img', {class:'imgprev', alt:''});
+  fi.addEventListener('change', async () => {
+    const f = fi.files[0]; if(!f) return;
+    try{ look[key] = await readImageFile(f, maxDim); getAsset(look[key]); syncAll(); changed(); toast('Image loaded'); }
+    catch(e){ toast(e.message); }
+    fi.value = '';
+  });
+  reg(() => { prev.hidden = !look[key]; if(look[key]) prev.src = look[key]; });
+  return h('div', {class:'field'}, h('span', {text:label}), h('div', {class:'btns'}, btn('Load image', () => fi.click()), btn('Clear', () => { look[key] = ''; syncAll(); changed(); })), prev, fi);
+}
+
+/* ================= left panel ================= */
+const left = $('#left');
+{
+  let usePal = true;
+  const startGrid = h('div', {class:'starters'});
+  for(const name of Object.keys(STARTERS)){
+    startGrid.append(h('button', {type:'button', text:name, onclick:() => {
+      const st = STARTERS[name], L = DEFAULT_LOOK();
+      L.seed = look.seed; L.motion = clone(look.motion);
+      L.palette = usePal && st.pal ? [...st.pal] : [...look.palette];
+      Object.assign(L.params, st.p || {});
+      for(const [k, v] of Object.entries(st.map || {})) L.idx[+k] = v;
+      for(const [k, v] of Object.entries(st.op || {})) L.op[+k] = v;
+      look = normalizeLook(L); syncAll(); changed(); toast(`Starting point "${name}" applied`);
+    }}));
+  }
+  const seedF = numField({get:() => look.seed, set:v => { look.seed = v; changed(); }, min:0, max:99999, step:1, int:true, dragUnit:1});
+  reg(() => seedF.sync());
+  const varGrid = h('div', {class:'vars'});
+  const palIn = h('input', {type:'checkbox'}); palIn.checked = true; palIn.addEventListener('change', () => { usePal = palIn.checked; });
+  left.append(section('Look', true,
+    h('span', {class:'muted', text:'Starting points (keep your motion settings)'}), startGrid,
+    h('label', {class:'switch'}, palIn, h('span', {class:'track'}), h('span', {text:'Use the starter colors too'})),
+    h('div', {class:'row'}, lockBtn('seed'), h('span', {class:'lab', text:'Seed'}), h('span'), seedF),
+    h('div', {class:'btns'}, btn('New seed', () => { look.seed = Math.floor(Math.random()*99999); syncAll(); changed(); }), btn('Randomize', randomize), btn('Variations', () => makeVariations(varGrid))),
+    h('p', {class:'hint', text:'Locked values stay put when you randomize or make variations.'}),
+    varGrid));
+  const isRadial = () => look.params.layout === 'radial';
+  const only = (cond, sec) => { reg(() => { sec.style.display = cond() ? '' : 'none'; }); return sec; };
+  const layoutHint = h('p', {class:'hint'});
+  reg(() => { layoutHint.textContent = isRadial() ? 'Emblems are centered in a columns × rows grid. Node size is relative to the ring and slot spacing.' : 'Grid spacing is a share of the frame height. Node size is relative to the spacing.'; });
+  const lw = widgets('layout'), gridKeys = ['pitch','gridRot','occupancy'], radKeys = ['emCols','emRows','emSize','emVary','emSpinAlt'];
+  DEFS.filter(d => d.s === 'layout').forEach((d, i) => { if(gridKeys.includes(d.k)) only(() => !isRadial(), lw[i]); if(radKeys.includes(d.k)) only(isRadial, lw[i]); });
+  left.append(section('Layout', true, layoutHint, ...lw));
+  left.append(section('Nodes and bonds', true, h('p', {class:'hint', text:'Fusion reach is how far nodes reach for each other before the neck pinches off. Bond thickness sets the neck of explicit bonds (arm chains, bonding neighbors).'}), ...widgets('nodes')));
+  left.append(only(() => !isRadial(), section('Grid motion', true, h('p', {class:'hint', text:'Nodes walk slowly from cell to cell and always return to where they started, so the loop closes. Out-and-back paths retrace their steps. Timing randomness 0 moves everyone together.'}), ...widgets('gmove'))));
+  left.append(only(() => !isRadial(), section('Mitosis', true, h('p', {class:'hint', text:'A node splits into a neighbor cell, stays apart, then fuses back. Events are placed at random on the loop, so some start apart and play as fusion first, then split again.'}), ...widgets('mito'))));
+  left.append(only(() => !isRadial(), section('Bonding neighbors', false, h('p', {class:'hint', text:'Neighbors that grow a neck between them for a while, then let go. Bonds stretch with moving nodes and release when they drift too far.'}), ...widgets('bond'))));
+  left.append(only(isRadial, section('Radial emblem', true, h('p', {class:'hint', text:'One arm is a walk on rings and slots, repeated around the center. Spiral bias steps sideways along the rings; negative values turn the other way.'}), ...widgets('radial'))));
+  left.append(only(isRadial, section('Radial motion', true, h('p', {class:'hint', text:'Spin moves in whole arm steps (1/N of a turn), so even one step per loop closes seamlessly. Morphing walks the nodes through several motifs from the same seed.'}), ...widgets('rmotion'))));
+  left.append(section('3D turn', false, h('p', {class:'hint', text:'Spheres keep the nodes round and turn them in depth like a molecule. Flat disc squashes the whole drawing like a card turning. Depth spreads the nodes front to back for Spheres.'}), ...widgets('three')));
+  left.append(section('Gather into a dot', false, h('p', {class:'hint', text:'Everything converges into one dot. With 3D off, the turn while gathering uses Spheres automatically.'}), ...widgets('finale')));
+  left.append(section('Easing', true, h('p', {class:'hint', text:'Influence like keyframe velocity in After Effects. Used by steps, splits, bonds, ticks, morphs and the gather.'}), ...widgets('ease')));
+  left.append(section('Style', false, h('p', {class:'hint', text:'Cut-out polarity fills the frame with Shape A and cuts the nodes out. Mixed fill picks solid or outline per group. Shape opacity uses the Shape A opacity for all shapes.'}), ...widgets('style')));
+  left.append(section('Color mapping', false, h('p', {class:'hint', text:'Groups are arms in radial emblems and a node with its daughters on grids. Ramp numbers refer to the 7 palette colors.'}), ...widgets('colmap')));
+  left.append(section('Background', false, h('p', {class:'hint', text:'Gradients run from Background to Background 2.'}), ...widgets('bg')));
+
+  const durF = numField({get:() => look.motion.dur, set:v => { look.motion.dur = v; changed(); syncAll(); }, min:1, max:600, step:0.5, dec:1, dragUnit:0.1});
+  const fpsF = numField({get:() => look.motion.fps, set:v => { look.motion.fps = v; changed(); syncAll(); }, min:1, max:120, step:1, int:true, dragUnit:0.25});
+  const calmNote = h('p', {class:'hint badge'}), loopNote = h('p', {class:'hint'});
+  reg(() => { durF.sync(); fpsF.sync(); });
+  afterParam = () => { calmNote.textContent = effectiveP(look).limited ? 'Calm motion is capping some speeds or cycles for this duration.' : ''; };
+  reg(() => { afterParam(); loopNote.textContent = look.motion.loop ? `Seamless loop: frame ${totalFrames()} flows back into frame 0.` : 'Free-running: wander and the gradient keep going. Steps, splits, spins and the gather stay loop-timed.'; });
+  left.append(section('Motion', true,
+    toggle('Loop (seamless)', () => look.motion.loop, v => look.motion.loop = v, true), loopNote,
+    h('div', {class:'row nolock'}, h('span', {class:'lab', text:'Duration s'}), h('span'), durF),
+    h('div', {class:'row nolock'}, h('span', {class:'lab', text:'Frame rate'}), h('span'), fpsF),
+    toggle('Calm motion limit', () => look.motion.calm, v => look.motion.calm = v), calmNote,
+    h('p', {class:'hint', text:'Steps per loop and duration set the speed: 2 steps in a 20 s loop is a slow drift.'}),
+    ...widgets('motion')));
+  left.append(section('Finishing', false, h('p', {class:'hint', text:'Switch these off when you finish in After Effects.'}), ...widgets('finish')));
+}
+function randomize(){
+  if(!locks.has('seed')) look.seed = Math.floor(Math.random()*99999);
+  for(const d of DEFS){ if(!d.rnd || locks.has(d.k)) continue; let v = d.rnd[0] + Math.random()*(d.rnd[1] - d.rnd[0]); if(d.int) v = Math.round(v); look.params[d.k] = v; }
+  syncAll(); changed();
+}
+function jitterLook(base, amt){
+  const L = clone(base);
+  if(!locks.has('seed')) L.seed = Math.floor(Math.random()*99999);
+  for(const d of DEFS){ if(!d.rnd || locks.has(d.k)) continue; let v = L.params[d.k] + (Math.random()*2 - 1)*(d.rnd[1] - d.rnd[0])*amt; v = clamp(v, d.min, d.max); if(d.int) v = Math.round(v); L.params[d.k] = v; }
+  return L;
+}
+function previewSize(w){ return [w, Math.max(24, Math.min(w, Math.round(w*R.h/R.w)))]; }
+function smallRender(w, L = look, frm = frame){ const [W, H] = previewSize(w); const c = document.createElement('canvas'); c.width = W; c.height = H; drawFrame(c.getContext('2d'), W, H, 0, 0, frm, L); return c; }
+function makeVariations(grid){
+  if(rendering) return;
+  grid.replaceChildren();
+  for(let i = 0; i < 6; i++){
+    const L = jitterLook(look, 0.15);
+    grid.append(h('button', {type:'button', title:`Seed ${L.seed}. Click to use this variation`, onclick:() => { look = L; syncAll(); changed(); toast('Variation applied'); }}, smallRender(260, L)));
+  }
+}
+
+/* ================= viewport + timeline ================= */
+const cv = $('#cv'), cctx = cv.getContext('2d', {alpha:false});
+const stage = $('#stage');
+function layoutStage(){
+  const vp = $('#viewport').getBoundingClientRect();
+  const aw = Math.max(50, vp.width - 36), ah = Math.max(50, vp.height - 36), ar = R.w/R.h;
+  let w = aw, hgt = aw/ar; if(hgt > ah){ hgt = ah; w = ah*ar; }
+  stage.style.width = w + 'px'; stage.style.height = hgt + 'px';
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(2, Math.round(w*dpr*previewQ)); cv.height = Math.max(2, Math.round(hgt*dpr*previewQ));
+  dirty = true;
+}
+new ResizeObserver(layoutStage).observe($('#viewport'));
+const tl = $('#timeline');
+const playB = btn('Pause', togglePlay);
+const scrub = h('input', {type:'range', min:0, max:1, step:1, value:0, 'aria-label':'Timeline'});
+const tc = h('span', {class:'tc'});
+const pq = h('select', {'aria-label':'Preview quality'}, ...[25, 50, 75, 100].map(v => h('option', {value:v/100, text:`Preview ${v}%`})));
+pq.value = '0.5'; pq.addEventListener('change', () => { previewQ = +pq.value; layoutStage(); });
+const viewSel = h('select', {'aria-label':'View'}, h('option', {value:'result', text:'View: Result'}), h('option', {value:'gradient', text:'View: Gradient'}), h('option', {value:'split', text:'View: Split'}));
+viewSel.addEventListener('change', () => { view = viewSel.value; dirty = true; });
+const safeT = h('label', {class:'switch'}, h('input', {type:'checkbox', onchange:e => { $('#safe').hidden = !e.target.checked; }}), h('span', {class:'track'}), h('span', {text:'Safe zones'}));
+const cropB = btn('1:1 crop', () => { picking = !picking; stage.classList.toggle('picking', picking); cropB.classList.toggle('primary', picking); if(picking) toast('Click the preview where you want to inspect full resolution'); });
+const pfps = h('span', {class:'muted'});
+tl.append(playB, scrub, tc, viewSel, pq, safeT, cropB, pfps);
+scrub.addEventListener('input', () => { frame = +scrub.value; tAcc = frame/look.motion.fps; dirty = true; });
+function togglePlay(){ playing = !playing; playB.textContent = playing ? 'Pause' : 'Play'; }
+function updateTimeline(){
+  const total = totalFrames(); scrub.max = total - 1; scrub.value = frame;
+  const fps = look.motion.fps, s = Math.floor(frame/fps), f = frame % fps;
+  tc.innerHTML = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}:${String(f).padStart(2,'0')} <small>frame ${frame} / ${total - 1}</small>`;
+}
+document.addEventListener('keydown', e => { if(e.code === 'Space' && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)){ e.preventDefault(); togglePlay(); } });
+stage.addEventListener('click', e => {
+  if(!picking) return;
+  picking = false; stage.classList.remove('picking'); cropB.classList.remove('primary');
+  const r = stage.getBoundingClientRect();
+  const cx = (e.clientX - r.left)/r.width*R.w, cy = (e.clientY - r.top)/r.height*R.h;
+  const cw = Math.min(R.w, 1280), ch = Math.min(R.h, 720);
+  const x = Math.round(clamp(cx - cw/2, 0, R.w - cw)), y = Math.round(clamp(cy - ch/2, 0, R.h - ch));
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  drawFrame(c.getContext('2d'), R.w, R.h, x, y, frame, look, view);
+  $('#cropBody').replaceChildren(c);
+  $('#cropTitle').textContent = `1:1 crop of ${R.w}×${R.h} at x ${x}, y ${y}, frame ${frame}`;
+  $('#cropModal').hidden = false;
+});
+$('#cropClose').addEventListener('click', () => $('#cropModal').hidden = true);
+$('#cropModal').addEventListener('click', e => { if(e.target.id === 'cropModal') e.target.hidden = true; });
+
+let last = performance.now(), fpsN = 0, fpsT = 0, drawMs = 0;
+function tick(now){
+  const dt = Math.min(0.25, (now - last)/1000); last = now;
+  if(playing && !rendering){
+    tAcc += dt;
+    const f = Math.floor(tAcc*look.motion.fps) % totalFrames();
+    if(f !== frame){ frame = f; dirty = true; }
+  }
+  if(dirty && !rendering){
+    const t0 = performance.now();
+    try{ drawFrame(cctx, cv.width, cv.height, 0, 0, frame, look, view); }catch(err){ console.error(err); }
+    drawMs = drawMs*0.8 + (performance.now() - t0)*0.2;
+    dirty = false; updateTimeline(); fpsN++;
+  }
+  fpsT += dt; if(fpsT > 1){ pfps.textContent = rendering ? 'Rendering' : `${fpsN} fps`; $('#perf').textContent = `${Math.round(drawMs)} ms per preview frame, ${lastStats.items} nodes, ${lastStats.lanes} necks`; fpsN = 0; fpsT = 0; }
+  requestAnimationFrame(tick);
+}
+
+/* ================= right panel ================= */
+const right = $('#right');
+const tabs = h('div', {class:'tabs', role:'tablist'});
+const panes = {};
+['Color', 'Gradient', 'Library', 'Render'].forEach((name, i) => {
+  const pane = h('div', {class:'tabpane', role:'tabpanel'}); pane.hidden = i !== 0; panes[name] = pane;
+  const b = h('button', {class:i === 0 ? 'active' : '', role:'tab', type:'button', text:name, onclick:() => {
+    tabs.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active');
+    Object.values(panes).forEach(p => p.hidden = true); pane.hidden = false;
+  }});
+  tabs.append(b);
+});
+right.append(tabs, ...Object.values(panes));
+
+/* Color tab */
+{
+  const pal = h('div', {class:'palette'});
+  for(let i = 0; i < 7; i++){
+    const ci = h('input', {type:'color', 'aria-label':`Color ${i + 1}`});
+    const hx = h('input', {class:'hex', type:'text', spellcheck:'false', 'aria-label':`Color ${i + 1} hex`});
+    const apply = v => { look.palette[i] = v.toLowerCase(); syncAll(); changed(); };
+    ci.addEventListener('input', () => apply(ci.value));
+    hx.addEventListener('change', () => { let v = hx.value.trim(); if(!v.startsWith('#')) v = '#' + v; if(/^#[0-9a-f]{6}$/i.test(v)) apply(v); else hx.value = look.palette[i]; });
+    reg(() => { ci.value = look.palette[i]; if(document.activeElement !== hx) hx.value = look.palette[i]; });
+    pal.append(h('div', {class:'sw'}, h('b', {text:String(i + 1)}), ci, hx));
+  }
+  const setName = h('input', {class:'txt', placeholder:'Palette set name, e.g. Client X brand'});
+  const setList = h('div', {class:'chips'});
+  let sets = store.get('ficageb.palettes', []);
+  const drawSets = () => {
+    setList.replaceChildren(...(sets.length ? sets.map((s, k) => h('div', {class:'pset', title:'Apply this palette', onclick:() => { look.palette = [...s.colors]; syncAll(); changed(); toast(`Palette "${s.name}" applied`); }},
+      h('i', {}, ...s.colors.map(c => { const sp = h('span'); sp.style.background = c; return sp; })),
+      h('span', {text:s.name}),
+      h('button', {class:'x', type:'button', title:'Delete palette set', text:'×', onclick:e => { e.stopPropagation(); sets.splice(k, 1); store.set('ficageb.palettes', sets); drawSets(); }}))) : [h('p', {class:'empty', text:'No palette sets yet.'})]));
+  };
+  drawSets();
+  const els = h('div', {class:'sec-body', style:'padding:0;gap:5px'});
+  els.append(h('div', {class:'ehead'}, h('span', {text:'Element'}), h('span', {text:'Color #'}), h('span', {text:'Opacity'})));
+  ELEMENTS.forEach((name, k) => {
+    const chip = h('span', {class:'chip'});
+    const idxF = numField({get:() => look.idx[k] + 1, set:v => { look.idx[k] = v - 1; chip.style.background = look.palette[look.idx[k]]; changed(); }, min:1, max:7, step:1, int:true, dragUnit:0.1});
+    const rng = h('input', {type:'range', min:0, max:1, step:0.01, 'aria-label':`${name} opacity`});
+    const num = numField({get:() => look.op[k], set:v => { look.op[k] = v; rng.value = v; changed(); }, min:0, max:1, step:0.01});
+    rng.addEventListener('input', () => { look.op[k] = +rng.value; num.sync(); changed(); });
+    reg(() => { chip.style.background = look.palette[look.idx[k]]; idxF.sync(); rng.value = look.op[k]; num.sync(); });
+    els.append(h('div', {class:'erow'}, h('span', {class:'lab', text:name}), chip, idxF, rng, num));
+  });
+  const cres = h('p', {class:'hint'});
+  panes.Color.append(
+    section('Palette', true, pal, h('p', {class:'hint', text:'Every element below uses one of these 7 colors by number.'})),
+    section('Elements', true, els, h('div', {class:'btns'},
+      btn('Shuffle color numbers', () => { for(let k = 2; k < ELEMENTS.length; k++) look.idx[k] = Math.floor(Math.random()*7); syncAll(); changed(); }),
+      btn('Reset numbers', () => { look.idx = DEFAULT_LOOK().idx; syncAll(); changed(); }))),
+    section('Palette sets', false, h('div', {class:'btns', style:'flex-wrap:nowrap'}, setName, btn('Save', () => {
+      const n = setName.value.trim() || `Palette ${sets.length + 1}`;
+      sets.push({name:n, colors:[...look.palette]}); store.set('ficageb.palettes', sets); setName.value = ''; drawSets(); toast(`Palette "${n}" saved`);
+    })), setList),
+    section('Text contrast', false, h('p', {class:'hint', text:'Checks the lower-third safe zone at the current frame.'}), btn('Check contrast', () => {
+      const c = smallRender(320), W = c.width, H = c.height;
+      const x = Math.round(W*0.05), y = Math.round(H*0.74), cw = Math.max(1, Math.round(W*0.45)), ch = Math.max(1, Math.round(H*0.16));
+      const d = c.getContext('2d').getImageData(x, y, cw, ch).data;
+      const lin = v => { v /= 255; return v <= 0.04045 ? v/12.92 : Math.pow((v + 0.055)/1.055, 2.4); };
+      let L = 0; for(let i = 0; i < d.length; i += 4) L += 0.2126*lin(d[i]) + 0.7152*lin(d[i + 1]) + 0.0722*lin(d[i + 2]);
+      L /= d.length/4;
+      const white = 1.05/(L + 0.05), dark = (L + 0.05)/0.055, mark = r => r >= 4.5 ? 'good' : r >= 3 ? 'large text only' : 'too low';
+      cres.innerHTML = `White text: <b>${white.toFixed(1)}:1</b> (${mark(white)})<br>Dark text: <b>${dark.toFixed(1)}:1</b> (${mark(dark)})`;
+    }), cres));
+}
+
+/* Gradient tab */
+panes.Gradient.append(
+  section('Gradient layer', true, h('p', {class:'hint', text:'A moving grayscale map that controls the cells. Use View: Gradient or Split in the timeline bar to see it.'}),
+    ...widgets('grad'), imageLoader('Gradient image (for type Image)', 'gImg', 512)),
+  section('What the gradient controls', true, h('p', {class:'hint', text:'Amount per property. Positive values follow the light areas of the gradient, negative values follow the dark areas.'}),
+    ...widgets('targets')));
+
+/* Library tab */
+{
+  const LKEY = 'ficageb.fluidgrid.library';
+  let lib = store.get(LKEY, []);
+  let currentId = null, delArm = 0;
+  const nameI = h('input', {class:'txt', placeholder:'Look name'});
+  const list = h('div', {class:'lib'});
+  const fileI = h('input', {type:'file', accept:'.json,application/json', style:'display:none'});
+  const thumb = () => smallRender(240).toDataURL('image/jpeg', 0.82);
+  const persist = () => store.set(LKEY, lib);
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const draw = () => {
+    list.replaceChildren(...(lib.length ? lib.map(it => h('button', {class:'lib-item' + (it.id === currentId ? ' active' : ''), type:'button', onclick:() => {
+      look = normalizeLook(clone(it.look)); currentId = it.id; nameI.value = it.name; syncAll(); changed(); draw();
+    }}, h('img', {src:it.thumb, alt:''}), h('span', {text:it.name}), h('small', {text:new Date(it.updated).toLocaleDateString()}))) : [h('p', {class:'empty', text:'No saved looks yet. Name the current look and press Save as.'})]));
+  };
+  const saveAs = () => {
+    const it = {id:newId(), name:nameI.value.trim() || `Look ${lib.length + 1}`, look:clone(look), thumb:thumb(), updated:Date.now()};
+    lib.unshift(it); currentId = it.id; nameI.value = it.name; persist(); draw(); toast(`Saved "${it.name}"`);
+  };
+  const cur = () => lib.find(x => x.id === currentId);
+  const delB = btn('Delete', () => {
+    const it = cur(); if(!it){ toast('Select a look first'); return; }
+    if(Date.now() - delArm > 3000){ delArm = Date.now(); delB.textContent = 'Click again'; setTimeout(() => delB.textContent = 'Delete', 3000); return; }
+    lib = lib.filter(x => x !== it); currentId = null; delArm = 0; delB.textContent = 'Delete'; persist(); draw(); toast(`Deleted "${it.name}"`);
+  }, 'danger');
+  fileI.addEventListener('change', async () => {
+    const f = fileI.files[0]; if(!f) return;
+    try{
+      const data = JSON.parse(await f.text());
+      if(data.generator && data.generator !== GEN) throw new Error(`this file is for the ${data.generator} generator`);
+      const looks = Array.isArray(data) ? data : data.looks;
+      if(!Array.isArray(looks)) throw new Error('no looks found in this file');
+      let n = 0;
+      for(const it of looks){ if(!it || !it.look || (it.look.generator && it.look.generator !== GEN)) continue; lib.push({id:newId(), name:it.name || 'Imported look', look:normalizeLook(it.look), thumb:it.thumb || '', updated:it.updated || Date.now()}); n++; }
+      persist(); draw(); toast(`Imported ${n} look${n === 1 ? '' : 's'}`);
+    }catch(e){ toast('Import failed: ' + e.message); }
+    fileI.value = '';
+  });
+  draw();
+  panes.Library.append(
+    section('Current look', true, nameI, h('div', {class:'btns'},
+      btn('Save', () => { const it = cur(); if(!it){ saveAs(); return; } it.look = clone(look); it.thumb = thumb(); it.updated = Date.now(); persist(); draw(); toast(`Saved "${it.name}"`); }, 'primary'),
+      btn('Save as', saveAs),
+      btn('Duplicate', () => { const it = cur(); if(!it){ toast('Select a look first'); return; } const c = clone(it); c.id = newId(); c.name = it.name + ' copy'; c.updated = Date.now(); lib.unshift(c); currentId = c.id; nameI.value = c.name; persist(); draw(); }),
+      btn('Rename', () => { const it = cur(); if(!it){ toast('Select a look first'); return; } const n = nameI.value.trim(); if(!n){ toast('Type the new name first'); return; } it.name = n; persist(); draw(); }),
+      delB),
+      h('p', {class:'hint', text:'Save updates the selected look. Save as creates a new one.'})),
+    section('Library', true, list),
+    section('Backup and sharing', false, h('div', {class:'btns'},
+      btn('Export library', () => download(new Blob([JSON.stringify({app:'FICAGEB', generator:GEN, version:VERSION, looks:lib}, null, 1)], {type:'application/json'}), 'FICAGEB_FluidGrid_library.json')),
+      btn('Export current look', () => download(new Blob([JSON.stringify({app:'FICAGEB', generator:GEN, version:VERSION, looks:[{name:nameI.value.trim() || 'Look', look}]}, null, 1)], {type:'application/json'}), (nameI.value.trim() || 'FICAGEB_FluidGrid_look').replace(/[^\w-]+/g, '_') + '.json')),
+      btn('Import', () => fileI.click())), fileI));
+}
+
+/* Render tab */
+let outDir = null, job = null;
+function frameName(pattern, i, suffix = ''){
+  let p = (pattern || 'FICAGEB_FluidGrid_####').replace(/\.png$/i, '');
+  if(!/#/.test(p)) p += '_####';
+  return p.replace(/#+/, m => String(i).padStart(m.length, '0')) + suffix + '.png';
+}
+function toBlob(c){ return c.convertToBlob ? c.convertToBlob({type:'image/png'}) : new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('PNG encoding failed')), 'image/png')); }
+function makeCanvas(w, hgt){ if(typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, hgt); const c = document.createElement('canvas'); c.width = w; c.height = hgt; return c; }
+function plan(kind){
+  const total = totalFrames();
+  let W = R.w, H = R.h; if(R.draft){ W = Math.max(2, Math.round(W/2)); H = Math.max(2, Math.round(H/2)); }
+  let frames = [];
+  if(kind === 'test'){ const m = Math.floor(total/2); frames = [...new Set([0, 1, m, total - 2, total - 1])].filter(f => f >= 0 && f < total); }
+  else { const s = R.full ? 0 : clamp(R.start | 0, 0, total - 1), e = R.full ? total - 1 : clamp(R.end | 0, s, total - 1); for(let f = s; f <= e; f += R.draft ? 2 : 1) frames.push(f); }
+  return {W, H, frames, total};
+}
+{
+  const P = panes.Render;
+  const fmtSel = h('select', {'aria-label':'Format preset'});
+  let customFormats = store.get('ficageb.formats', []);
+  const fillFormats = () => {
+    fmtSel.replaceChildren(h('option', {value:'', text:'Custom size'}), ...FORMATS.map(([n, w, hgt]) => h('option', {value:`${w}x${hgt}`, text:n})), ...customFormats.map(f => h('option', {value:`${f.w}x${f.h}`, text:`${f.name} ${f.w}×${f.h}`})));
+    fmtSel.value = [...fmtSel.options].some(o => o.value === `${R.w}x${R.h}`) ? `${R.w}x${R.h}` : '';
+  };
+  fmtSel.addEventListener('change', () => { if(!fmtSel.value) return; const [w, hgt] = fmtSel.value.split('x').map(Number); R.w = w; R.h = hgt; afterR(); });
+  const field = (label, el) => h('label', {class:'field'}, h('span', {text:label}), el);
+  const wF = numField({get:() => R.w, set:v => { R.w = v; afterR(); }, min:16, max:30000, step:1, int:true, dragUnit:4});
+  const hF = numField({get:() => R.h, set:v => { R.h = v; afterR(); }, min:16, max:30000, step:1, int:true, dragUnit:4});
+  const venueName = h('input', {class:'txt', placeholder:'Venue name, e.g. Palais des Congrès main hall'});
+  const sizeInfo = h('p', {class:'info'}), rangeInfo = h('p', {class:'info'}), estOut = h('p', {class:'info'});
+  const sF = numField({get:() => R.start, set:v => { R.start = v; afterR(); }, min:0, max:99999, step:1, int:true, dragUnit:0.5});
+  const eF = numField({get:() => R.end, set:v => { R.end = v; afterR(); }, min:0, max:99999, step:1, int:true, dragUnit:0.5});
+  const parF = numField({get:() => R.parallel, set:v => { R.parallel = v; afterR(); }, min:1, max:12, step:1, int:true, dragUnit:0.1});
+  const patI = h('input', {class:'txt', spellcheck:'false'});
+  patI.addEventListener('change', () => { R.pattern = patI.value.trim() || 'FICAGEB_FluidGrid_####'; afterR(); });
+  const dirLabel = h('span', {class:'info'});
+  const prog = h('div', {class:'progress'}, h('div'));
+  const statusEl = h('p', {class:'status'});
+  const rpName = h('input', {class:'txt', placeholder:'Render preset name'});
+  const rpSel = h('select', {'aria-label':'Render presets'});
+  let rpresets = store.get('ficageb.renderPresets', []);
+  const fillRP = () => rpSel.replaceChildren(h('option', {value:'', text:rpresets.length ? 'Load a render preset' : 'No render presets yet'}), ...rpresets.map((p, i) => h('option', {value:i, text:p.name})));
+  rpSel.addEventListener('change', () => { const p = rpresets[+rpSel.value]; if(!p) return; R = Object.assign(DEFAULT_R(), clone(p.r)); R.pattern = String(R.pattern || '').replace(/Voronoi|GeneCode/gi, 'FluidGrid'); afterR(); toast(`Render preset "${p.name}" loaded`); });
+  fillRP();
+  const status = (msg, cls = '') => { statusEl.textContent = msg; statusEl.className = 'status ' + cls; };
+  const setProg = v => prog.firstChild.style.width = (v*100).toFixed(1) + '%';
+  function afterR(){ syncAll(); layoutStage(); scheduleSave(); }
+  reg(() => {
+    wF.sync(); hF.sync(); sF.sync(); eF.sync(); parF.sync(); fillFormats();
+    if(document.activeElement !== patI) patI.value = R.pattern;
+    const {W, H, frames, total} = plan('full');
+    sizeInfo.innerHTML = `Output <b>${W}×${H}</b>${R.draft ? ' (draft, half size)' : ''}, ${(W*H/1e6).toFixed(1)} MP. Shapes are drawn as vectors at this exact size.`;
+    rangeInfo.innerHTML = `Loop is <b>${total} frames</b> (${look.motion.dur} s at ${look.motion.fps} fps). This render: <b>${frames.length} frames</b>. First file: ${frameName(R.pattern, R.draft ? 0 : frames[0] || 0)}`;
+    dirLabel.textContent = outDir ? `Folder: ${outDir.name}` : 'No folder chosen';
+  });
+  async function getDir(){
+    if(outDir) return outDir;
+    if(!('showDirectoryPicker' in window)) return null;
+    try{ outDir = await window.showDirectoryPicker({mode:'readwrite', id:'ficageb'}); syncAll(); return outDir; }
+    catch(e){ if(e.name === 'AbortError') return undefined; status('Folder access is blocked in this window. Open the HTML file directly in Chrome or Edge to write frames to a folder.', 'warn'); return null; }
+  }
+  async function fileExists(dir, name){ try{ const f = await (await dir.getFileHandle(name)).getFile(); return f.size > 0; }catch(e){ return false; } }
+  async function writeFile(dir, name, blob){ const fh = await dir.getFileHandle(name, {create:true}); const w = await fh.createWritable(); await w.write(blob); await w.close(); }
+  const renderFrame = (W, H, f) => { const c = makeCanvas(W, H); drawFrame(c.getContext('2d'), W, H, 0, 0, f, look); return c; };
+  const renderB = btn('Render', () => startRender('full'), 'primary');
+  const testB = btn('Test render', () => startRender('test'));
+  const stopB = btn('Stop', () => { if(job){ job.cancel = true; status('Stopping after the frames in progress…', 'warn'); } }, 'danger');
+  stopB.disabled = true;
+  async function startRender(kind){
+    if(job) return;
+    const {W, H, frames} = plan(kind);
+    if(W > 32767 || H > 32767 || W*H > 268e6){ status('This frame is larger than a browser image can hold (about 268 million pixels). The desktop version will handle this size.', 'err'); return; }
+    const dir = await getDir();
+    if(dir === undefined) return;
+    if(!dir && frames.length > 30){ status('Without folder access, only test renders and up to 30 frames can download. Open this file directly in Chrome or Edge.', 'err'); return; }
+    await preloadAssets(look);
+    job = {cancel:false}; rendering = true; renderB.disabled = testB.disabled = true; stopB.disabled = false;
+    const par = R.parallel, t0 = performance.now();
+    let done = 0, skipped = 0;
+    const inflight = new Set();
+    const progress = () => {
+      setProg(done/frames.length);
+      const real = done - skipped, el = performance.now() - t0, eta = real > 0 ? el/real*(frames.length - done) : 0;
+      status(`${done} / ${frames.length} frames${skipped ? `, ${skipped} skipped` : ''}. Elapsed ${fmtTime(el)}${real ? `, about ${fmtTime(eta)} left` : ''}`);
+    };
+    status('Starting…');
+    try{
+      for(let i = 0; i < frames.length; i++){
+        if(job.cancel) break;
+        const f = frames[i];
+        const num = kind === 'test' ? f : R.draft ? i : f;
+        const name = frameName(R.pattern, num, kind === 'test' ? '_test' : '');
+        if(dir && R.skip && kind !== 'test' && await fileExists(dir, name)){ skipped++; done++; progress(); continue; }
+        while(inflight.size >= par) await Promise.race(inflight);
+        const c = renderFrame(W, H, f);
+        const p = toBlob(c).then(b => dir ? writeFile(dir, name, b) : download(b, name)).then(() => { done++; progress(); });
+        const tracked = p.finally(() => inflight.delete(tracked));
+        inflight.add(tracked);
+        await sleep(0);
+      }
+      await Promise.all(inflight);
+      const el = fmtTime(performance.now() - t0);
+      status(job.cancel ? `Stopped at ${done} of ${frames.length} frames. Render again with "Skip existing" on to continue.` : `Done: ${frames.length} frames in ${el}${dir ? ` to ${dir.name}` : ''}.`, job.cancel ? 'warn' : 'ok');
+    }catch(err){ status('Render stopped: ' + err.message, 'err'); }
+    finally{ job = null; rendering = false; dirty = true; geomCache.key = null; renderB.disabled = testB.disabled = false; stopB.disabled = true; }
+  }
+  async function estimate(){
+    if(job) return;
+    const {W, H, frames} = plan('full');
+    estOut.textContent = 'Measuring one frame…'; await sleep(30); await preloadAssets(look);
+    let t = performance.now(); geomCache.key = null; const c = renderFrame(W, H, frame); const rMs = performance.now() - t;
+    t = performance.now(); const b = await toBlob(c); const eMs = performance.now() - t;
+    const per = Math.max(rMs, eMs/R.parallel) + rMs*0.1;
+    estOut.innerHTML = `About <b>${fmtTime(per*frames.length)}</b> and <b>${fmtBytes(b.size*frames.length)}</b> for ${frames.length} frames (one frame: ${Math.round(rMs)} ms drawing, ${Math.round(eMs)} ms PNG, ${fmtBytes(b.size)}).`;
+    dirty = true;
+  }
+  P.append(
+    section('Output size', true, fmtSel, h('div', {class:'grid2'}, field('Width px', wF), field('Height px', hF)), sizeInfo,
+      h('div', {class:'btns', style:'flex-wrap:nowrap'}, venueName, btn('Save format', () => {
+        const n = venueName.value.trim(); if(!n){ toast('Type a venue name first'); return; }
+        customFormats.push({name:n, w:R.w, h:R.h}); store.set('ficageb.formats', customFormats); venueName.value = ''; fillFormats(); toast('Venue format saved');
+      }))),
+    section('Frames', true, rangeInfo,
+      toggle('Full loop', () => R.full, v => { R.full = v; scheduleSave(); }),
+      h('div', {class:'grid2'}, field('Start frame', sF), field('End frame', eF)),
+      toggle('Draft (half size, every 2nd frame)', () => R.draft, v => { R.draft = v; layoutStage(); scheduleSave(); })),
+    section('Speed', false, field('Frames encoded in parallel', parF), btn('Estimate time and space', estimate), estOut),
+    section('Files', true, field('File name (#### becomes the frame number)', patI),
+      h('div', {class:'btns'}, btn('Choose folder', async () => { outDir = null; await getDir(); syncAll(); }), dirLabel),
+      toggle('Skip existing frames (resume)', () => R.skip, v => { R.skip = v; scheduleSave(); }),
+      h('p', {class:'hint', text:'PNG sequence, 8-bit. Import into After Effects as an image sequence.'})),
+    section('Render', true, h('div', {class:'btns'}, renderB, testB, stopB), prog, statusEl,
+      btn('Save current frame as PNG', async () => { if(job) return; await preloadAssets(look); const c = renderFrame(R.w, R.h, frame); download(await toBlob(c), frameName(R.pattern, frame, '_still')); dirty = true; })),
+    section('Render presets', false,
+      h('div', {class:'btns', style:'flex-wrap:nowrap'}, rpName, btn('Save', () => {
+        const n = rpName.value.trim() || `${R.w}×${R.h}${R.draft ? ' draft' : ''}`;
+        rpresets.push({name:n, r:clone(R)}); store.set('ficageb.renderPresets', rpresets); rpName.value = ''; fillRP(); toast(`Render preset "${n}" saved`);
+      })),
+      h('div', {class:'btns', style:'flex-wrap:nowrap'}, rpSel, btn('Delete', () => { const i = +rpSel.value; if(rpSel.value === '' || !rpresets[i]) return; rpresets.splice(i, 1); store.set('ficageb.renderPresets', rpresets); fillRP(); }))));
+}
+
+getAsset(look.gImg);
+layoutStage();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

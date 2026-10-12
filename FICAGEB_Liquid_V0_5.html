@@ -1,0 +1,1395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FICAGEB Liquid v0.5 — Fehmi Can Generate Backgrounds</title>
+<style>
+:root{
+  --bg:#1b1b1b; --panel:#232323; --panel-2:#2b2b2b; --field:#181818; --line:#363636;
+  --text:#bcbcbc; --hi:#ececec; --muted:#7a7a7a; --accent:#3d95ea; --accent-dim:#24527f;
+  --warn:#e3a73c; --ok:#58bd7c; --danger:#e0605a;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+  font:12px/1.4 "Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+.app{display:grid;grid-template-rows:38px minmax(0,1fr);height:100vh}
+header{display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid #111}
+.brand{display:flex;align-items:baseline;gap:8px}
+.logo{color:var(--hi);font-weight:700;letter-spacing:.06em;font-size:14px}
+.gen{color:var(--hi);font-weight:600}
+.ver{color:var(--accent);font-weight:600}
+.sub{color:var(--muted)}
+.spacer{flex:1}
+.hstat{color:var(--muted)}
+.main{display:grid;grid-template-columns:310px minmax(0,1fr) 350px;min-height:0}
+aside{overflow-y:auto;background:var(--panel);min-height:0}
+.left{border-right:1px solid #111}
+.right{border-left:1px solid #111;display:flex;flex-direction:column}
+.center{display:grid;grid-template-rows:minmax(0,1fr) auto;min-width:0;min-height:0;background:#151515}
+.viewport{position:relative;display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden}
+.stage{position:relative;box-shadow:0 0 0 1px #000}
+.stage canvas{display:block;width:100%;height:100%}
+.stage.picking{cursor:crosshair}
+
+.safe{position:absolute;inset:0;pointer-events:none}
+.safe[hidden]{display:none}
+.sz{position:absolute;border:1px dashed rgba(255,255,255,.5);mix-blend-mode:difference}
+.sz.action{inset:3.5%}
+.sz.title{inset:5% 10%}
+.sz.lower{left:5%;top:74%;width:45%;height:16%;border-style:solid}
+.sz.logo{right:5%;top:6%;width:12%;height:12%;border-style:solid}
+.sz span{position:absolute;left:6px;top:4px;color:#fff;font-size:11px}
+
+.timeline{display:flex;align-items:center;gap:12px;padding:8px 12px;background:var(--panel);border-top:1px solid #111;flex-wrap:wrap}
+.timeline input[type=range]{flex:1;min-width:160px}
+.tc{color:var(--hi);min-width:150px}
+.tc small{color:var(--muted)}
+.muted{color:var(--muted)}
+
+details.sec{border-bottom:1px solid #161616}
+details.sec>summary{list-style:none;cursor:pointer;padding:7px 12px;background:var(--panel-2);color:var(--hi);font-weight:600;user-select:none;display:flex;align-items:center;gap:8px}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::before{content:"";border:4px solid transparent;border-left-color:var(--muted);margin-right:2px;transform-origin:2px 4px;transition:transform .12s}
+details.sec[open]>summary::before{transform:rotate(90deg)}
+.sec-body{padding:8px 12px 12px;display:grid;gap:6px}
+.sub-h{color:var(--hi);font-weight:600;margin-top:6px}
+
+.row{display:grid;grid-template-columns:18px 96px minmax(0,1fr) 58px;align-items:center;gap:6px}
+.row.nolock{grid-template-columns:114px minmax(0,1fr) 58px}
+.row .wide{grid-column:span 2}
+.lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.num{width:100%;background:transparent;border:1px solid transparent;border-radius:2px;color:var(--accent);padding:2px 4px;text-align:right;cursor:ew-resize}
+.num:hover{border-color:var(--line)}
+.num:focus{background:var(--field);border-color:var(--accent);cursor:text;color:var(--hi)}
+.txt{width:100%;background:var(--field);border:1px solid var(--line);border-radius:2px;padding:4px 6px;color:var(--hi)}
+.txt:focus{border-color:var(--accent);outline:none}
+textarea.txt{resize:vertical;min-height:70px}
+select{background:var(--field);border:1px solid var(--line);border-radius:2px;padding:3px 4px;color:var(--hi);min-width:0}
+
+input[type=range]{-webkit-appearance:none;appearance:none;height:16px;background:transparent;width:100%;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:3px;background:#3a3a3a;border-radius:2px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#d4d4d4;margin-top:-3.5px;border:0}
+input[type=range]:hover::-webkit-slider-thumb{background:#fff}
+input[type=range]::-moz-range-track{height:3px;background:#3a3a3a;border-radius:2px}
+input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:#d4d4d4;border:0}
+
+.lock{width:18px;height:18px;padding:0;border:0;background:transparent;color:#555;cursor:pointer;display:grid;place-items:center;border-radius:2px}
+.lock:hover{color:var(--text)}
+.lock.on{color:var(--warn)}
+
+.btn{background:#383838;border:1px solid #444;border-radius:3px;padding:4px 10px;color:var(--hi);cursor:pointer;white-space:nowrap}
+.btn:hover{background:#424242}
+.btn.primary{background:var(--accent-dim);border-color:#3576b3}
+.btn.primary:hover{background:#2b6299}
+.btn.danger{border-color:#7a3a37}
+.btn:disabled{opacity:.45;cursor:default}
+.btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.hint{margin:0;color:var(--muted)}
+.badge{color:var(--warn)}
+
+.switch{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch .track{width:26px;height:14px;border-radius:7px;background:#3c3c3c;position:relative;flex:none;transition:background .12s}
+.switch .track::after{content:"";position:absolute;left:2px;top:2px;width:10px;height:10px;border-radius:50%;background:#9a9a9a;transition:transform .12s,background .12s}
+.switch input:checked+.track{background:var(--accent-dim)}
+.switch input:checked+.track::after{transform:translateX(12px);background:#fff}
+.switch input:focus-visible+.track{outline:1px solid var(--accent)}
+.switch.main-t span:last-child{color:var(--hi);font-weight:600}
+
+.starters{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.starters button{background:var(--field);border:1px solid var(--line);border-radius:3px;padding:6px 4px;cursor:pointer;color:var(--hi)}
+.starters button:hover{border-color:var(--accent)}
+.vars{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.vars button{padding:0;border:1px solid var(--line);background:#000;cursor:pointer;border-radius:2px;overflow:hidden;display:block}
+.vars button:hover{border-color:var(--accent)}
+.vars canvas{display:block;width:100%;height:auto}
+
+.tabs{display:flex;background:var(--panel-2);border-bottom:1px solid #111;flex:none}
+.tabs button{flex:1;padding:9px 0;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;font-weight:600}
+.tabs button.active{color:var(--hi);border-bottom-color:var(--accent)}
+.tabpane{overflow-y:auto;flex:1;min-height:0}
+.tabpane[hidden]{display:none}
+
+.palette{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.sw{display:grid;gap:3px;justify-items:center}
+.sw b{color:var(--hi);font-size:13px}
+.sw input[type=color]{width:100%;height:34px;padding:0;border:1px solid #444;border-radius:2px;background:none;cursor:pointer}
+.sw input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.sw input[type=color]::-webkit-color-swatch{border:0}
+.sw .hex{width:100%;background:transparent;border:1px solid transparent;color:var(--muted);font-size:10px;text-align:center;padding:1px 0}
+.sw .hex:focus{background:var(--field);border-color:var(--accent);color:var(--hi);outline:none}
+.erow{display:grid;grid-template-columns:minmax(0,1fr) 14px 34px 74px 44px;align-items:center;gap:6px}
+.erow .num{text-align:center}
+.chip{width:14px;height:14px;border-radius:2px;border:1px solid rgba(255,255,255,.25)}
+.ehead{display:grid;grid-template-columns:minmax(0,1fr) 54px 122px;color:var(--muted);font-size:11px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.pset{display:flex;align-items:center;gap:6px;background:var(--field);border:1px solid var(--line);border-radius:3px;padding:3px 4px 3px 6px;cursor:pointer}
+.pset:hover{border-color:var(--accent)}
+.pset i{display:flex}
+.pset i span{width:9px;height:14px}
+.pset .x{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 3px}
+.pset .x:hover{color:var(--danger)}
+.imgprev{max-width:100%;max-height:70px;border:1px solid var(--line);background:#000;display:block}
+
+.lib{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.lib-item{display:grid;gap:3px;text-align:left;background:var(--field);border:1px solid var(--line);border-radius:3px;padding:5px;cursor:pointer}
+.lib-item:hover{border-color:#555}
+.lib-item.active{border-color:var(--accent)}
+.lib-item img{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+.lib-item span{color:var(--hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib-item small{color:var(--muted)}
+.empty{color:var(--muted);margin:4px 0}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.field{display:grid;gap:3px}
+.field>span{color:var(--muted);font-size:11px}
+.field .num{text-align:left;background:var(--field);border-color:var(--line)}
+.info{color:var(--muted)}
+.info b{color:var(--hi);font-weight:600}
+.progress{height:6px;background:#333;border-radius:3px;overflow:hidden}
+.progress div{height:100%;width:0;background:var(--accent);transition:width .2s}
+.status{min-height:18px}
+.status.warn{color:var(--warn)} .status.err{color:var(--danger)} .status.ok{color:var(--ok)}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10;padding:24px}
+.modal[hidden]{display:none}
+.modal-box{background:var(--panel);border:1px solid #444;border-radius:4px;max-width:100%;max-height:100%;display:flex;flex-direction:column}
+.modal-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:8px 12px;border-bottom:1px solid #111;color:var(--hi)}
+.modal-body{overflow:auto;background:#000}
+.modal-body canvas{display:block}
+.toast{position:fixed;right:16px;bottom:16px;background:#333;border:1px solid #4a4a4a;color:var(--hi);padding:8px 12px;border-radius:3px;opacity:0;transform:translateY(6px);transition:all .18s;pointer-events:none;z-index:20}
+.toast.show{opacity:1;transform:none}
+
+@media (max-width:1100px){ .main{grid-template-columns:270px minmax(0,1fr) 310px} }
+@media (max-width:860px){
+  .app{height:auto;grid-template-rows:auto auto}
+  .main{grid-template-columns:1fr}
+  .center{height:60vh;order:-1}
+  aside{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.stage{background:#000}
+.stage.alpha{background:repeating-conic-gradient(#2c2c2c 0 25%,#202020 0 50%) 0 0/16px 16px}
+.handles{position:absolute;inset:0;pointer-events:none;overflow:visible}
+.handles[hidden]{display:none}
+.hd{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.45);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;cursor:grab;pointer-events:auto;padding:0;box-shadow:0 0 0 1px rgba(0,0,0,.7)}
+.hd:active{cursor:grabbing}
+.hd.off{opacity:.35}
+.handles .ring{position:absolute;border:1px dashed rgba(255,255,255,.5);border-radius:50%;pointer-events:none}
+.cen{border:1px solid var(--line);border-radius:3px;background:var(--field)}
+.cen>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:5px 8px;color:var(--hi);user-select:none}
+.cen>summary::-webkit-details-marker{display:none}
+.cen>summary .pos{color:var(--muted);font-size:11px}
+.cen .cbody{display:grid;gap:5px;padding:4px 8px 8px}
+.cen .x{margin-left:auto;border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 3px}
+.cen .x:hover{color:var(--danger)}
+.cen.dis>summary .nm{color:var(--muted);text-decoration:line-through}
+.colpick{display:flex;gap:4px;align-items:center}
+.colpick .lab{width:114px;flex:none}
+.colpick button{width:20px;height:18px;border-radius:2px;border:1px solid rgba(255,255,255,.2);padding:0;cursor:pointer}
+.colpick button.on{outline:2px solid var(--accent);outline-offset:1px}
+.erow3{display:grid;grid-template-columns:minmax(0,1fr) 14px 44px;align-items:center;gap:6px}
+.erow3 .num{text-align:center}
+.fatal{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);color:var(--hi);z-index:50;padding:40px;text-align:center}
+.szr{position:absolute;border:1px solid #fff;border-radius:50%;pointer-events:none;opacity:.55}
+.grip{position:absolute;width:8px;height:8px;border:1px solid #fff;border-radius:1px;cursor:ew-resize;pointer-events:auto;box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+.anc{position:absolute;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;pointer-events:none}
+.anc::before,.anc::after{content:"";position:absolute;background:currentColor;box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+.anc::before{left:5px;top:0;width:1px;height:11px}.anc::after{top:5px;left:0;height:1px;width:11px}
+.handles>.ring{position:absolute}
+.ring.reach{border-style:dotted;border-color:rgba(255,255,255,.35)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><span class="logo">FICAGEB</span><span class="gen">Liquid</span><span class="ver">v0.5</span><span class="sub">Fehmi Can Generate Backgrounds</span></div>
+    <div class="spacer"></div>
+    <div class="hstat" id="perf"></div>
+  </header>
+  <div class="main">
+    <aside class="left" id="left"></aside>
+    <div class="center">
+      <div class="viewport" id="viewport">
+        <div class="stage" id="stage">
+          <canvas id="cv"></canvas>
+          <div class="safe" id="safe" hidden>
+            <div class="sz action"></div><div class="sz title"></div>
+            <div class="sz lower"><span>Speaker name and title</span></div>
+            <div class="sz logo"><span>Logo</span></div>
+          </div>
+          <div class="handles" id="handles"></div>
+        </div>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+    <aside class="right" id="right"></aside>
+  </div>
+</div>
+<div class="modal" id="cropModal" hidden>
+  <div class="modal-box">
+    <div class="modal-head"><span id="cropTitle">1:1 crop</span><button class="btn" id="cropClose" type="button">Close</button></div>
+    <div class="modal-body" id="cropBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const GEN = 'liquid', VERSION = '0.5';
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+function h(tag, attrs = {}, ...kids){
+  const e = document.createElement(tag);
+  for(const [k, v] of Object.entries(attrs)){
+    if(v === undefined || v === null) continue;
+    if(k === 'class') e.className = v;
+    else if(k === 'text') e.textContent = v;
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for(const c of kids.flat()) if(c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const TAU = Math.PI*2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const mix = (a, b, t) => a + (b - a)*t;
+const smooth = (e0, e1, x) => { const t = clamp((x - e0)/((e1 - e0) || 1e-9), 0, 1); return t*t*(3 - 2*t); };
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast('Could not save: browser storage is full or blocked'); return false; } }
+};
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function btn(label, fn, cls = ''){ return h('button', {class:'btn ' + cls, onclick:fn, type:'button'}, label); }
+function fmtTime(ms){ const s = Math.round(ms/1000); const hh = Math.floor(s/3600), mm = Math.floor(s%3600/60), ss = s%60; return hh ? `${hh} h ${mm} min` : mm ? `${mm} min ${ss} s` : `${ss} s`; }
+function fmtBytes(b){ if(b > 1e9) return (b/1e9).toFixed(1) + ' GB'; if(b > 1e6) return (b/1e6).toFixed(1) + ' MB'; return Math.round(b/1e3) + ' KB'; }
+const lockSvg = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('width', '11'); s.setAttribute('height', '12'); s.setAttribute('viewBox', '0 0 11 12'); s.innerHTML = '<rect x="1" y="5" width="9" height="7" rx="1" fill="currentColor"/><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5" fill="none" stroke="currentColor" stroke-width="1.4"/>'; return s; };
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; }; }
+function ihash(n){ n = Math.imul(n ^ (n >>> 16), 0x7feb352d); n = Math.imul(n ^ (n >>> 15), 0x846ca68b); n ^= n >>> 16; return (n >>> 0)/4294967296; }
+const hh2 = (a, b = 0) => ihash(Math.imul(a + 1, 0x9E3779B1) ^ Math.imul(b + 7, 0x85EBCA77));
+const hash3 = (a, b, c) => ihash(Math.imul(a + 11, 0x9E3779B1) ^ Math.imul(b + 13, 0x85EBCA77) ^ Math.imul(c + 17, 0xC2B2AE3D));
+function download(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+
+/* ================= simplex noise ================= */
+const PERM = new Uint8Array(512);
+{ const r = mulberry32(1337), p = [...Array(256).keys()]; for(let i = 255; i > 0; i--){ const j = Math.floor(r()*(i + 1)); [p[i], p[j]] = [p[j], p[i]]; } for(let i = 0; i < 512; i++) PERM[i] = p[i & 255]; }
+const GR3 = [1,1,0,-1,1,0,1,-1,0,-1,-1,0,1,0,1,-1,0,1,1,0,-1,-1,0,-1,0,1,1,0,-1,1,0,1,-1,0,-1,-1];
+function snoise3(x, y, z){
+  const F3 = 1/3, G3 = 1/6;
+  const s = (x + y + z)*F3, i = Math.floor(x + s), j = Math.floor(y + s), k = Math.floor(z + s);
+  const t = (i + j + k)*G3, x0 = x - (i - t), y0 = y - (j - t), z0 = z - (k - t);
+  let i1, j1, k1, i2, j2, k2;
+  if(x0 >= y0){ if(y0 >= z0){ i1=1;j1=0;k1=0;i2=1;j2=1;k2=0; } else if(x0 >= z0){ i1=1;j1=0;k1=0;i2=1;j2=0;k2=1; } else { i1=0;j1=0;k1=1;i2=1;j2=0;k2=1; } }
+  else { if(y0 < z0){ i1=0;j1=0;k1=1;i2=0;j2=1;k2=1; } else if(x0 < z0){ i1=0;j1=1;k1=0;i2=0;j2=1;k2=1; } else { i1=0;j1=1;k1=0;i2=1;j2=1;k2=0; } }
+  const x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3;
+  const x2 = x0 - i2 + 2*G3, y2 = y0 - j2 + 2*G3, z2 = z0 - k2 + 2*G3;
+  const x3 = x0 - 1 + 3*G3, y3 = y0 - 1 + 3*G3, z3 = z0 - 1 + 3*G3;
+  const ii = i & 255, jj = j & 255, kk = k & 255;
+  let n = 0, g, tt;
+  tt = 0.6 - x0*x0 - y0*y0 - z0*z0; if(tt > 0){ g = (PERM[ii + PERM[jj + PERM[kk]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x0 + GR3[g+1]*y0 + GR3[g+2]*z0); }
+  tt = 0.6 - x1*x1 - y1*y1 - z1*z1; if(tt > 0){ g = (PERM[ii + i1 + PERM[jj + j1 + PERM[kk + k1]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x1 + GR3[g+1]*y1 + GR3[g+2]*z1); }
+  tt = 0.6 - x2*x2 - y2*y2 - z2*z2; if(tt > 0){ g = (PERM[ii + i2 + PERM[jj + j2 + PERM[kk + k2]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x2 + GR3[g+1]*y2 + GR3[g+2]*z2); }
+  tt = 0.6 - x3*x3 - y3*y3 - z3*z3; if(tt > 0){ g = (PERM[ii + 1 + PERM[jj + 1 + PERM[kk + 1]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x3 + GR3[g+1]*y3 + GR3[g+2]*z3); }
+  return 32*n;
+}
+/* ================= UI widgets ================= */
+function numField({get, set, min, max, step, int, dec, dragUnit}){
+  const el = h('input', {class:'num', type:'text', inputmode:'decimal', spellcheck:'false'});
+  const dp = dec ?? (step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : step >= 0.001 ? 3 : 4);
+  const fmt = v => int ? String(Math.round(v)) : (+v).toFixed(dp);
+  const clampV = v => { v = Math.min(max, Math.max(min, v)); return int ? Math.round(v) : v; };
+  const unit = dragUnit ?? (int ? Math.max(step, 1)*0.25 : step);
+  let drag = null;
+  el.addEventListener('pointerdown', e => { if(document.activeElement === el) return; e.preventDefault(); drag = {x:e.clientX, v:get(), moved:false}; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointermove', e => {
+    if(!drag) return; const dx = e.clientX - drag.x;
+    if(Math.abs(dx) > 2) drag.moved = true; if(!drag.moved) return;
+    const mul = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
+    set(clampV(drag.v + dx*unit*mul)); el.value = fmt(get());
+  });
+  el.addEventListener('pointerup', () => { if(!drag) return; const m = drag.moved; drag = null; if(!m){ el.focus(); el.select(); } });
+  const commit = () => { const v = parseFloat(String(el.value).replace(',', '.')); if(!isNaN(v)) set(clampV(v)); el.value = fmt(get()); };
+  el.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ commit(); el.blur(); }
+    else if(e.key === 'Escape'){ el.value = fmt(get()); el.blur(); }
+    else if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){ e.preventDefault(); const st = (e.shiftKey ? 10 : 1)*(int ? 1 : step); set(clampV(get() + (e.key === 'ArrowUp' ? st : -st))); el.value = fmt(get()); }
+  });
+  el.addEventListener('blur', commit);
+  el.sync = () => { if(document.activeElement !== el) el.value = fmt(get()); };
+  el.sync();
+  return el;
+}
+function lockBtn(key){
+  const b = h('button', {class:'lock', type:'button', title:'Lock: Randomize and Variations leave this value alone', onclick:() => { locks.has(key) ? locks.delete(key) : locks.add(key); syncL(); scheduleSave(); }}, lockSvg());
+  const syncL = () => { const on = locks.has(key); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); };
+  reg(syncL); return b;
+}
+let afterParam = () => {};
+function paramRow(d){
+  const get = () => look.params[d.k];
+  const lab = h('span', {class:'lab', text:d.l, title:d.l});
+  const rng = h('input', {type:'range', min:d.min, max:d.max, step:d.step, 'aria-label':d.l});
+  const num = numField({get, set:v => { look.params[d.k] = v; rng.value = v; changed(); afterParam(); }, min:d.min, max:d.max, step:d.step, int:d.int, dragUnit:d.drag});
+  rng.addEventListener('input', () => { look.params[d.k] = +rng.value; num.sync(); changed(); afterParam(); });
+  reg(() => { rng.value = get(); num.sync(); });
+  return d.rnd ? h('div', {class:'row'}, lockBtn(d.k), lab, rng, num) : h('div', {class:'row nolock'}, lab, rng, num);
+}
+function toggle(label, get, set, main){
+  const inp = h('input', {type:'checkbox'});
+  inp.addEventListener('change', () => { set(inp.checked); changed(); syncAll(); });
+  reg(() => { inp.checked = !!get(); });
+  return h('label', {class:'switch' + (main ? ' main-t' : '')}, inp, h('span', {class:'track'}), h('span', {text:label}));
+}
+function widget(d){
+  if(d.t === 'num') return paramRow(d);
+  if(d.t === 'toggle') return toggle(d.l, () => look.params[d.k], v => look.params[d.k] = v, d.main);
+  if(d.t === 'select'){
+    const sel = h('select', {class:'wide', 'aria-label':d.l}, ...d.o.map(([v, l]) => h('option', {value:v, text:l})));
+    sel.addEventListener('change', () => { look.params[d.k] = sel.value; changed(); syncAll(); });
+    reg(() => { sel.value = look.params[d.k]; });
+    return h('div', {class:'row nolock'}, h('span', {class:'lab', text:d.l}), sel);
+  }
+  if(d.t === 'textarea'){
+    const ta = h('textarea', {class:'txt', rows:'6', spellcheck:'false'});
+    ta.addEventListener('input', () => { look.params[d.k] = ta.value; changed(); });
+    reg(() => { if(document.activeElement !== ta) ta.value = look.params[d.k]; });
+    return h('label', {class:'field'}, h('span', {text:d.l}), ta);
+  }
+  const inp = h('input', {class:'txt', type:'text', spellcheck:'false'});
+  inp.addEventListener('change', () => { look.params[d.k] = inp.value; changed(); });
+  reg(() => { if(document.activeElement !== inp) inp.value = look.params[d.k]; });
+  return h('label', {class:'field'}, h('span', {text:d.l}), inp);
+}
+const widgets = s => DEFS.filter(d => d.s === s).map(widget);
+function section(title, open, ...kids){ return h('details', {class:'sec', open:open ? '' : null}, h('summary', {text:title}), h('div', {class:'sec-body'}, ...kids)); }
+
+/* ================= parameters ================= */
+const DEFS = [
+  // shape
+  {k:'scale', t:'num', l:'Overall size', min:0.2, max:3, step:0.01, d:1, s:'shape'},
+  {k:'body', t:'num', l:'Body size', min:0, max:2.5, step:0.01, d:1, s:'shape', rnd:[0.65, 1.35]},
+  {k:'logMix', t:'num', l:'Core falloff', min:0, max:1, step:0.01, d:1, s:'shape', rnd:[0.5, 1]},
+  {k:'pulseMode', t:'select', l:'Pulse style', o:[['breathe','Breathe (stays on its center)'],['swing','Swing (original, sways off center)']], d:'breathe', s:'shape'},
+  {k:'wobble', t:'num', l:'Pulse amount', min:0, max:2, step:0.01, d:1, s:'shape', rnd:[0.3, 1.5]},
+  {k:'stretchX', t:'num', l:'Stretch width', min:0.3, max:4, step:0.01, d:1, s:'shape', rnd:[0.8, 1.6]},
+  {k:'stretchY', t:'num', l:'Stretch height', min:0.3, max:4, step:0.01, d:1, s:'shape', rnd:[0.8, 1.3]},
+  {k:'merge', t:'num', l:'Liquid merge', min:0, max:3, step:0.01, d:0.6, s:'shape', rnd:[0.2, 1.5]},
+  {k:'colSharp', t:'num', l:'Color separation', min:0.2, max:12, step:0.1, d:3, s:'shape', rnd:[1, 6]},
+  // turbulence
+  {k:'turb', t:'num', l:'Turbulence', min:0, max:2, step:0.01, d:0.5, s:'turb', rnd:[0.25, 0.8]},
+  {k:'freq', t:'num', l:'Turbulence scale', min:0.2, max:8, step:0.01, d:2, s:'turb', rnd:[1.2, 2.8]},
+  {k:'detail', t:'num', l:'Fine detail', min:0, max:1.5, step:0.01, d:0, s:'turb', rnd:[0, 0.35]},
+  {k:'detScale', t:'num', l:'Fine detail scale', min:1, max:6, step:0.01, d:2.3, s:'turb', rnd:[1.5, 4]},
+  // motion
+  {k:'timeScale', t:'num', l:'Overall speed', min:0, max:4, step:0.01, d:1, s:'motion'},
+  {k:'spinX', t:'num', l:'Tumble speed', min:-2, max:2, step:0.01, d:0.4, s:'motion', rnd:[-0.6, 0.6]},
+  {k:'spinY', t:'num', l:'Roll speed', min:-2, max:2, step:0.01, d:0.3, s:'motion', rnd:[-0.5, 0.5]},
+  {k:'pulse', t:'num', l:'Pulse speed', min:0, max:3, step:0.01, d:0.7, s:'motion', rnd:[0.2, 1.2]},
+  {k:'flow', t:'num', l:'Flow speed', min:0, max:3, step:0.01, d:1, s:'motion', rnd:[0.3, 1.5]},
+  {k:'hoverBase', t:'num', l:'Hover, every center', min:0, max:0.8, step:0.005, d:0, s:'motion', rnd:[0, 0.15]},
+  {k:'wigAll', t:'num', l:'Hover amount ×, all', min:0, max:3, step:0.01, d:1, s:'motion'},
+  {k:'wigSpeedAll', t:'num', l:'Hover speed, all', min:0, max:4, step:0.01, d:1, s:'motion'},
+  {k:'rotBase', t:'num', l:'Rotation, every center', min:-2, max:2, step:0.01, d:0, s:'motion'},
+  {k:'rotAll', t:'num', l:'Rotation speed ×, all', min:0, max:4, step:0.01, d:1, s:'motion'},
+  {k:'rotVar', t:'num', l:'Rotation variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.6]},
+  {k:'rotMix', t:'toggle', l:'Mixed directions (some CW, some CCW)', d:false, s:'motion'},
+  {k:'speedVar', t:'num', l:'Speed variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.5]},
+  {k:'hoverVar', t:'num', l:'Hover speed variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.7]},
+  {k:'hoverAmtVar', t:'num', l:'Hover amount variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.6]},
+  {k:'varSeed', t:'num', l:'Variation seed', min:0, max:9999, step:1, int:true, d:1, s:'motion', drag:0.5},
+  // ray marching
+  {k:'zoom', t:'num', l:'Field of view', min:0.3, max:3, step:0.01, d:1, s:'camera'},
+  {k:'persp', t:'num', l:'Perspective', min:0, max:1, step:0.01, d:1, s:'camera'},
+  {k:'wideFix', t:'toggle', l:'Wide frame correction', d:true, s:'camera'},
+  {k:'steps', t:'num', l:'March steps', min:2, max:32, step:1, int:true, d:6, s:'camera', drag:0.1},
+  {k:'start', t:'num', l:'Start depth', min:0, max:5, step:0.01, d:2.5, s:'camera'},
+  {k:'maxStep', t:'num', l:'Step limit', min:0.1, max:3, step:0.01, d:1, s:'camera'},
+  {k:'reach', t:'num', l:'Glow reach', min:0.3, max:6, step:0.01, d:2.5, s:'camera', rnd:[1.6, 3.4]},
+  {k:'density', t:'num', l:'Glow density', min:0, max:2, step:0.01, d:0.7, s:'camera', rnd:[0.45, 1]},
+  {k:'shade', t:'num', l:'Shading depth', min:0.01, max:0.6, step:0.005, d:0.17, s:'camera', rnd:[0.08, 0.3]},
+  {k:'lightAz', t:'num', l:'Light direction', min:-180, max:180, step:1, d:45, s:'camera'},
+  {k:'lightEl', t:'num', l:'Light height', min:-89, max:89, step:1, d:35, s:'camera'},
+  // glow and grade
+  {k:'gain', t:'num', l:'Glow strength', min:0, max:12, step:0.05, d:5, s:'grade'},
+  {k:'shadowAmt', t:'num', l:'Shadow tone amount', min:0, max:1.5, step:0.01, d:0.4, s:'grade'},
+  {k:'exposure', t:'num', l:'Exposure', min:0, max:4, step:0.01, d:1, s:'grade'},
+  {k:'sat', t:'num', l:'Saturation', min:0, max:2, step:0.01, d:1, s:'grade'},
+  {k:'contrast', t:'num', l:'Contrast', min:0.3, max:2, step:0.01, d:1, s:'grade'},
+  {k:'hue', t:'num', l:'Hue shift', min:-180, max:180, step:1, d:0, s:'grade'},
+  {k:'tone', t:'toggle', l:'Soft highlights (tone map)', d:false, s:'grade'},
+  {k:'blend', t:'select', l:'Blend on background', o:[['add','Add (glow)'],['screen','Screen'],['over','Over (light backgrounds)']], d:'add', s:'grade'},
+  {k:'overK', t:'num', l:'Over strength', min:0.2, max:4, step:0.01, d:1.5, s:'grade'},
+  {k:'transparent', t:'toggle', l:'Transparent background (PNG alpha)', d:false, s:'grade'},
+  // background
+  {k:'bgMode', t:'select', l:'Type', o:[['solid','Solid'],['linear','Linear, 2 colors'],['linear3','Linear, 3 colors'],['radial','Radial'],['corners','Four corners']], d:'solid', s:'bg'},
+  {k:'bgAngle', t:'num', l:'Angle', min:-180, max:180, step:1, d:90, s:'bg'},
+  {k:'bgScale', t:'num', l:'Radial size', min:0.2, max:3, step:0.01, d:1, s:'bg'},
+  {k:'bgEase', t:'toggle', l:'Smooth gradient', d:true, s:'bg'},
+  // finishing
+  {k:'dimOn', t:'toggle', l:'Center dimming', d:true, s:'finish'},
+  {k:'dimAmt', t:'num', l:'Dimming amount', min:0, max:1, step:0.01, d:0.7, s:'finish'},
+  {k:'dimIn', t:'num', l:'Dimming inner radius', min:0, max:1.5, step:0.01, d:0.3, s:'finish'},
+  {k:'dimOut', t:'num', l:'Dimming outer radius', min:0.01, max:2, step:0.01, d:0.5, s:'finish'},
+  {k:'vig', t:'num', l:'Vignette', min:0, max:1, step:0.01, d:0, s:'finish'},
+  {k:'grain', t:'num', l:'Grain', min:0, max:0.3, step:0.005, d:0, s:'finish'},
+  {k:'grainSize', t:'num', l:'Grain size px', min:1, max:8, step:0.5, d:1, s:'finish'},
+];
+const DEF = Object.fromEntries(DEFS.map(d => [d.k, d]));
+const ELEMENTS = ['Background 1', 'Background 2', 'Background 3', 'Background 4', 'Shadow tone'];
+const DEFAULT_PALETTE = ['#03060b','#0b1a2b','#ff8099','#40bfff','#cc66ff','#66ff33','#f2f4f7'];
+const DEFAULT_IDX = [0,1,1,0,3];
+const MAXC = 8;
+const CDEF = {on:true, x:0, y:0, size:1, col:2, bright:1, speed:1, phase:0, driftR:0, driftS:0.3, wigA:0, wigS:0.8, wigSize:0, rot:0, angle:0};
+const mkC = o => { const c = Object.assign({}, CDEF, o || {}); for(const k of Object.keys(CDEF)) if(typeof c[k] !== typeof CDEF[k]) c[k] = CDEF[k]; c.col = clamp(Math.round(c.col), 0, 6); return c; };
+const DEFAULT_LOOK = () => ({
+  generator:GEN, seed:7,
+  params:Object.fromEntries(DEFS.map(d => [d.k, d.d])),
+  palette:[...DEFAULT_PALETTE],
+  idx:[...DEFAULT_IDX],
+  centers:[mkC()],
+  motion:{dur:10, fps:25, loop:true}
+});
+/* Starting points. p: parameters, c: centers, pal: palette, idx: element -> palette index (0-based) */
+const STARTERS = {
+  'Nebula': {p:{pulseMode:'swing'}, c:[{}]},
+  'Twin cells': {p:{merge:1, body:0.9, turb:0.55}, c:[{x:-0.38, y:0.05, size:0.8, col:2}, {x:0.4, y:-0.05, size:0.8, col:3, phase:140}]},
+  'Trio': {p:{merge:0.7, body:0.85, colSharp:4}, c:[{x:-0.45, y:-0.25, size:0.7, col:2}, {x:0.45, y:-0.25, size:0.7, col:3, phase:90}, {x:0, y:0.4, size:0.7, col:4, phase:200}]},
+  'Calm drift': {p:{merge:1.2, spinX:0.15, spinY:0.1, pulse:0.3, flow:0.4, dimOn:false}, c:[{x:-0.5, y:0.2, size:0.75, col:2, driftR:0.12, driftS:0.3, wigA:0.04, wigSize:0.08}, {x:0.3, y:-0.3, size:0.85, col:3, driftR:0.15, driftS:-0.25, phase:120}, {x:0.6, y:0.45, size:0.55, col:4, driftR:0.08, driftS:0.4, phase:240}]},
+  'Wide band': {p:{merge:1.4, body:0.8, stretchX:1.3, dimOn:false}, c:[-0.8, -0.4, 0, 0.4, 0.8].map((x, i) => ({x, y:0, size:0.6, col:[2,3,4,3,2][i], phase:i*72}))},
+  'Constellation': {p:{merge:0.15, turb:0.7, body:0.9, colSharp:6, dimOn:false}, c:[[-0.7,0.4,0.45],[-0.25,-0.35,0.5],[0.1,0.3,0.4],[0.55,-0.1,0.55],[0.8,0.5,0.35],[-0.6,-0.6,0.35],[0.35,-0.65,0.4]].map(([x, y, size], i) => ({x, y, size, col:2 + i % 3, phase:i*51}))},
+  'Hover field': {p:{merge:0.9, spinX:0.2, spinY:0.15, pulse:0.4, flow:0.5, dimOn:false, speedVar:0.35, hoverVar:0.6, hoverAmtVar:0.3}, c:[[-0.6,0.25,0.6,2],[-0.1,-0.3,0.7,3],[0.45,0.2,0.55,4],[0.75,-0.35,0.45,2]].map(([x, y, size, col], i) => ({x, y, size, col, phase:i*83, wigA:0.07, wigS:0.6 + i*0.15, wigSize:0.12}))},
+  'Violet core': {p:{shadowAmt:0.5, pulseMode:'swing'}, c:[{col:4}], pal:['#02040a','#0a1030','#ff8099','#1a66ff','#cc66ff','#66ff33','#f2f4f7']},
+  'Green signal': {p:{shadowAmt:0.5, pulseMode:'swing'}, c:[{col:5}], pal:['#020805','#0a2014','#ff8099','#1a9933','#cc66ff','#66ff33','#f2f4f7']},
+  'Soft light': {p:{blend:'over', overK:1.6, shadowAmt:0.25, bgMode:'linear', bgAngle:90, dimOn:false, gain:4, merge:0.8}, c:[{x:-0.3, y:0.1, size:0.85, col:2}, {x:0.35, y:-0.1, size:0.75, col:4, phase:160}], pal:['#eef1f6','#f9f6f2','#ff6f8f','#7fb6ff','#9b7bff','#5ccf8a','#1d1d1f']},
+};
+const FORMATS = [
+  ['HD 1920×1080', 1920, 1080], ['4K UHD 3840×2160', 3840, 2160], ['Wide LED 3840×1080', 3840, 1080],
+  ['Wide LED 7680×1080', 7680, 1080], ['12K LED 12000×2160', 12000, 2160], ['Square 1080×1080', 1080, 1080], ['Portrait 1080×1920', 1080, 1920]
+];
+const DEFAULT_R = () => ({w:1920, h:1080, full:true, start:0, end:249, draft:false,
+  parallel:Math.max(1, Math.min(6, Math.floor((navigator.hardwareConcurrency || 4)/2))), pattern:'FICAGEB_Liquid_####', skip:true});
+
+function normalizeLook(L){
+  const d = DEFAULT_LOOK(); if(!L || typeof L !== 'object') return d;
+  const out = Object.assign(d, L);
+  out.generator = GEN;
+  out.params = Object.assign(DEFAULT_LOOK().params, L.params || {});
+  out.motion = Object.assign(DEFAULT_LOOK().motion, L.motion || {});
+  if(!Array.isArray(out.palette) || out.palette.length !== 7) out.palette = [...DEFAULT_PALETTE];
+  out.idx = Array.isArray(out.idx) ? DEFAULT_IDX.map((v, k) => out.idx[k] ?? v) : [...DEFAULT_IDX];
+  out.centers = (Array.isArray(out.centers) && out.centers.length ? out.centers : [{}]).slice(0, MAXC).map(mkC);
+  return out;
+}
+
+/* ================= state ================= */
+const SKEY = 'ficageb.liquid.session';
+const session = store.get(SKEY, null);
+let look = normalizeLook(session && session.look);
+let locks = new Set(session && session.locks || []);
+let R = Object.assign(DEFAULT_R(), session && session.R || {});
+let frame = 0, tAcc = 0, playing = true, dirty = true, rendering = false, previewQ = 0.5, picking = false, view = 'result';
+let saveT;
+function scheduleSave(){ clearTimeout(saveT); saveT = setTimeout(() => store.set(SKEY, {look, locks:[...locks], R}), 500); }
+const totalFramesOf = L => Math.max(2, Math.round(L.motion.dur*L.motion.fps));
+const totalFrames = () => totalFramesOf(look);
+const syncers = [];
+function reg(fn){ syncers.push(fn); fn(); }
+function syncAll(){ syncers.forEach(f => f()); }
+function changed(){ dirty = true; scheduleSave(); }
+
+/* ================= time model ================= */
+/* In loop mode every speed snaps to a whole number of turns per loop (at least one if it is not zero),
+   so the last frame flows into the first. Flow runs on a circle in noise space for the same reason. */
+function loopTurns(speed, L){
+  const dur = totalFramesOf(L)/L.motion.fps;
+  let q = Math.round(speed*dur/TAU);
+  if(q === 0 && Math.abs(speed) > 1e-6) q = Math.sign(speed);
+  return q;
+}
+function motionAngle(speed, L, frm){
+  if(L.motion.loop) return loopTurns(speed, L)*TAU*frm/totalFramesOf(L);
+  return speed*frm/L.motion.fps;
+}
+/* Smooth random hover, like a wiggle expression. Three detuned sines; in loop mode each snaps to whole turns and they stay distinct. */
+/* Hover reads smooth noise along a path. Looping: the path is a closed circle whose length grows with the speed,
+   so any speed loops seamlessly without snapping, and every center can wander at its own pace. */
+function hover(L, i, frm, axis, speed){
+  const total = totalFramesOf(L), dur = total/L.motion.fps, v = speed*0.55;
+  const ox = hh2(L.seed*7 + i, axis)*200, oy = hh2(L.seed*7 + i, axis + 5)*200, oz = axis*31.7 + i*11.3;
+  let n;
+  if(L.motion.loop){ const rr = v*dur/TAU, th = TAU*frm/total; n = snoise3(ox + rr*Math.cos(th), oy + rr*Math.sin(th), oz); }
+  else n = snoise3(ox + v*frm/L.motion.fps, oy, oz);
+  return clamp(n*1.5, -1.3, 1.3);
+}
+/* Per-center multipliers from the variation settings: same seed, same result. */
+function centerVar(L, i){
+  const P = L.params, r = k => hh2(P.varSeed*131 + 17, i*7 + k)*2 - 1;
+  return {sp:Math.max(0.05, 1 + P.speedVar*r(0)), hs:Math.max(0.05, 1 + P.hoverVar*r(1)*1.2), ha:Math.max(0, 1 + P.hoverAmtVar*r(2)),
+    rs:Math.max(0.05, 1 + P.rotVar*r(3)*1.2)*(P.rotMix && r(4) < 0 ? -1 : 1)};
+}
+/* Whole-shape rotation speed of a center in rad/s: positive turns counterclockwise, negative clockwise. */
+function rotSpeed(L, c, i){
+  const P = L.params; return (P.rotBase + c.rot)*P.rotAll*centerVar(L, i).rs*P.timeScale;
+}
+/* Animated center in uv units (short side = 1) and its current size factor. */
+function centerState(L, c, i, frm, W, H){
+  const P = L.params, mn = Math.min(W, H), hx = 0.5*W/mn, hy = 0.5*H/mn;
+  const ph = hh2(L.seed, i)*TAU + c.phase*Math.PI/180;
+  const cv = centerVar(L, i);
+  const dth = motionAngle(c.driftS*P.timeScale*cv.sp, L, frm) + ph*0.7;
+  let ux = c.x*hx + c.driftR*Math.cos(dth), uy = c.y*hy + c.driftR*Math.sin(dth), sz = 1;
+  const wa = (P.hoverBase + c.wigA)*P.wigAll*cv.ha, ws = c.wigS*P.wigSpeedAll*P.timeScale*cv.hs;
+  if(wa > 0 && ws > 0){ ux += wa*hover(L, i, frm, 0, ws); uy += wa*hover(L, i, frm, 1, ws); }
+  if(c.wigSize > 0 && ws > 0) sz = Math.max(0.05, 1 + c.wigSize*P.wigAll*cv.ha*hover(L, i, frm, 2, ws));
+  return {ux, uy, sz, hx, hy};
+}
+const hex2rgb = hx => { const n = parseInt(String(hx).slice(1), 16) || 0; return [(n >> 16 & 255)/255, (n >> 8 & 255)/255, (n & 255)/255]; };
+
+/* ================= shader ================= */
+const VERT = `#version 300 es
+void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p*2.0 - 1.0, 0.0, 1.0); }`;
+const FRAG = `#version 300 es
+precision highp float;
+precision highp int;
+out vec4 O;
+uniform vec2 uFull, uOff;
+uniform int uN, uSteps, uView, uBlend, uBgMode;
+uniform vec4 uCen[8], uCS[8], uFl[8], uCol[8];
+uniform vec2 uZr[8];
+uniform vec2 uStretch;
+uniform float uFreq, uTurb, uDetail, uDetScale, uBody, uLogMix, uMerge, uColSharp;
+uniform float uPersp, uLim;
+uniform int uPulseMode;
+uniform int uEven;
+uniform float uFov, uCamZ, uStart, uMaxStep, uReach, uDensity;
+uniform vec3 uLight, uShadow;
+uniform float uGain, uExposure, uSat, uContrast, uHue, uOverK;
+uniform int uTone, uTransparent, uDimOn, uBgEase;
+uniform float uDimAmt, uDimIn, uDimOut, uVig, uGrain, uGrainPx, uFrame;
+uniform vec3 uBg1, uBg2, uBg3, uBg4;
+uniform float uBgAngle, uBgScale;
+
+float sdfC(vec3 p, int i){
+  vec4 C = uCen[i];
+  vec3 q = p - C.xyz;
+  vec2 zr = uZr[i];
+  q.xy = vec2(zr.x*q.x + zr.y*q.y, -zr.y*q.x + zr.x*q.y);
+  q.xy /= uStretch;
+  q /= C.w;
+  vec4 cs = uCS[i];
+  q.xz = vec2(cs.x*q.x - cs.y*q.z, cs.y*q.x + cs.x*q.z);
+  q.xy = vec2(cs.z*q.x - cs.w*q.y, cs.w*q.x + cs.z*q.y);
+  vec3 n = q*uFreq + uFl[i].xyz;
+  vec3 qb = uPulseMode == 1 ? q + vec3(uFl[i].w) : q*(1.0 - 0.2*uFl[i].w);
+  float r = length(qb);
+  float tb = sin(n.x + sin(n.z + sin(n.y)));
+  if(uDetail > 0.0){ vec3 m = n*uDetScale + vec3(1.7, 3.1, 5.3); tb += uDetail*sin(m.y + sin(m.x + sin(m.z))); }
+  float body = r*mix(1.0, log(r + 1.0), uLogMix);
+  return (body + tb*uTurb - uBody)*C.w*min(uStretch.x, uStretch.y);
+}
+float smin(float a, float b, float k){
+  if(k <= 1e-4) return min(a, b);
+  float h = clamp(0.5 + 0.5*(b - a)/k, 0.0, 1.0);
+  return mix(b, a, h) - k*h*(1.0 - h);
+}
+float mapD(vec3 p){
+  float d = 1e3;
+  for(int i = 0; i < 8; i++){ if(i >= uN) break; d = smin(d, sdfC(p, i), uMerge); }
+  return d;
+}
+float mapC(vec3 p, out vec3 col){
+  float d = 1e3; vec3 acc = vec3(0.0); float ws = 0.0;
+  for(int i = 0; i < 8; i++){
+    if(i >= uN) break;
+    float di = sdfC(p, i);
+    d = smin(d, di, uMerge);
+    float w = exp(-uColSharp*clamp(di, -2.0, 20.0));
+    acc += uCol[i].rgb*w; ws += w;
+  }
+  col = ws > 0.0 ? acc/ws : vec3(0.0);
+  return d;
+}
+vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735); float ca = cos(a); return c*ca + cross(k, c)*sin(a) + k*dot(k, c)*(1.0 - ca); }
+float hash12(vec2 p){ uvec2 q = uvec2(ivec2(p))*uvec2(1597334673u, 3812015801u); uint n = (q.x ^ q.y)*1597334673u; n ^= n >> 15; n *= 2246822519u; return float(n)*(1.0/4294967295.0); }
+vec3 background(vec2 fc){
+  if(uBgMode == 0) return uBg1;
+  vec2 n = fc/uFull;
+  if(uBgMode == 4){
+    float tx = uBgEase == 1 ? smoothstep(0.0, 1.0, n.x) : n.x, ty = uBgEase == 1 ? smoothstep(0.0, 1.0, n.y) : n.y;
+    return mix(mix(uBg3, uBg4, tx), mix(uBg1, uBg2, tx), ty);
+  }
+  float mn = min(uFull.x, uFull.y);
+  vec2 p = (fc - 0.5*uFull)/mn, hx = 0.5*uFull/mn;
+  float t;
+  if(uBgMode == 3) t = length(p)/(length(hx)*uBgScale);
+  else { vec2 d = vec2(cos(uBgAngle), sin(uBgAngle)); float ext = abs(d.x)*hx.x + abs(d.y)*hx.y; t = dot(p, d)/ext*0.5 + 0.5; }
+  t = clamp(t, 0.0, 1.0); if(uBgEase == 1) t = smoothstep(0.0, 1.0, t);
+  if(uBgMode == 2) return t < 0.5 ? mix(uBg1, uBg2, t*2.0) : mix(uBg2, uBg3, t*2.0 - 1.0);
+  return mix(uBg1, uBg2, t);
+}
+void main(){
+  vec2 fc = gl_FragCoord.xy + uOff;
+  float mn = min(uFull.x, uFull.y);
+  vec2 uv = (fc - 0.5*uFull)/mn;
+  /* Perspective 1 is the original camera, 0 is orthographic. Wide frame correction keeps the
+     perspective of a 16:9 frame and slides the camera sideways beyond it, so bodies near the left
+     and right of very wide frames look the same as in the middle instead of fading out. */
+  vec2 uvc = uLim > 0.0 ? clamp(uv, -uLim, uLim) : uv;
+  vec3 dir = vec3(uvc*uFov*uPersp, -1.0);
+  float dk = 1.0;
+  vec3 ro = vec3((uv - uvc*uPersp)*uFov*uCamZ, uCamZ), rd = normalize(dir);
+  vec3 col = vec3(0.0);
+  float d = uStart*dk;
+  if(uN > 0) for(int i = 0; i < 32; i++){
+    if(i >= uSteps) break;
+    vec3 p = ro + rd*d, gc;
+    float rz = mapC(p, gc);
+    float f = clamp((rz - mapD(p + uLight))*0.5, -0.1, 1.0);
+    vec3 base = uShadow + gc*uGain*f;
+    col = col*base + smoothstep(uReach, 0.0, rz)*uDensity*base;
+    d += min(rz, uMaxStep*dk);
+  }
+  vec3 neb = max(col*uExposure, 0.0);
+  if(uTone == 1) neb = 1.0 - exp(-neb);
+  if(uHue != 0.0) neb = max(hueShift(neb, uHue), 0.0);
+  float lum = dot(neb, vec3(0.2126, 0.7152, 0.0722));
+  neb = max(mix(vec3(lum), neb, uSat), 0.0);
+  neb = 0.5*pow(neb*2.0, vec3(uContrast));
+  if(uDimOn == 1){
+    float rad = mn*0.5, dist = distance(fc, 0.5*uFull);
+    neb = mix(neb*(1.0 - uDimAmt), neb, smoothstep(rad*uDimIn, rad*max(uDimOut, uDimIn + 0.001), dist));
+  }
+  vec2 nn = fc/uFull - 0.5;
+  float vig = 1.0 - uVig*smoothstep(0.35, 1.0, length(nn)*1.4142);
+  float g = (hash12(floor(fc/uGrainPx) + vec2(uFrame*17.0, uFrame*29.0)) - 0.5)*uGrain;
+  float dith = (hash12(fc + vec2(uFrame*7.0, 3.0)) - 0.5)/255.0;
+  float mx = max(neb.r, max(neb.g, neb.b));
+  if(uTransparent == 1 && uView != 2){
+    float a = clamp(mx, 0.0, 1.0)*vig;
+    vec3 c = mx > 1e-5 ? clamp(neb/mx, 0.0, 1.0) : vec3(0.0);
+    O = vec4(clamp(c + g, 0.0, 1.0), clamp(a + dith, 0.0, 1.0));
+    return;
+  }
+  vec3 bg = background(fc), outc;
+  if(uView == 1) outc = neb;
+  else if(uView == 2) outc = bg;
+  else if(uBlend == 0) outc = bg + neb;
+  else if(uBlend == 1) outc = 1.0 - (1.0 - bg)*(1.0 - clamp(neb, 0.0, 1.0));
+  else { float a = clamp(mx*uOverK, 0.0, 1.0); outc = mix(bg, mx > 1e-5 ? neb/mx : bg, a); }
+  outc = outc*vig + g + dith;
+  O = vec4(clamp(outc, 0.0, 1.0), 1.0);
+}`;
+
+function makeRenderer(canvas){
+  const gl = canvas.getContext('webgl2', {alpha:true, premultipliedAlpha:false, antialias:false, preserveDrawingBuffer:true, depth:false, stencil:false});
+  if(!gl) throw new Error('WebGL 2 is not available. Open this file in a current Chrome, Edge, Firefox or Safari.');
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('Shader error: ' + gl.getShaderInfoLog(s)); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG)); gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('Shader link error: ' + gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  gl.bindVertexArray(gl.createVertexArray());
+  const U = {};
+  for(let i = 0, n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS); i < n; i++){ const inf = gl.getActiveUniform(prog, i); U[inf.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(prog, inf.name); }
+  const f1 = (k, v) => U[k] && gl.uniform1f(U[k], v), i1 = (k, v) => U[k] && gl.uniform1i(U[k], v);
+  const f2 = (k, a, b) => U[k] && gl.uniform2f(U[k], a, b), f3 = (k, v) => U[k] && gl.uniform3f(U[k], v[0], v[1], v[2]);
+  const v4 = (k, arr) => U[k] && gl.uniform4fv(U[k], arr);
+  const zr = new Float32Array(16), cen = new Float32Array(32), cs = new Float32Array(32), fl = new Float32Array(32), co = new Float32Array(32);
+  const maxDim = Math.min(gl.getParameter(gl.MAX_VIEWPORT_DIMS)[0], gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+  return {gl, canvas, tile:Math.min(2048, maxDim),
+    /* Draws the region (ox, oy, tw, th) of a W×H frame (top-left origin) into the bottom-left of the canvas. */
+    draw(L, frm, W, H, ox, oy, tw, th, vw = 'result', refW = W){
+      const P = L.params, M = L.motion, total = totalFramesOf(L), dur = total/M.fps, camZ = 5;
+      const mn = Math.min(W, H), hx = 0.5*W/mn, hy = 0.5*H/mn, wk = P.zoom*camZ;
+      const act = []; L.centers.forEach((c, i) => { if(c.on && act.length < MAXC) act.push([c, i]); });
+      act.forEach(([c, i], j) => {
+        const ph = hh2(L.seed, i)*TAU + c.phase*Math.PI/180, ts = P.timeScale*c.speed*centerVar(L, i).sp;
+        const st = centerState(L, c, i, frm, W, H);
+        cen.set([st.ux*wk, st.uy*wk, 0, Math.max(0.01, c.size*st.sz*P.scale)], j*4);
+        const a = motionAngle(P.spinX*ts, L, frm) + ph, b = motionAngle(P.spinY*ts, L, frm) + ph*1.618;
+        cs.set([Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)], j*4);
+        const g = motionAngle(rotSpeed(L, c, i), L, frm) + c.angle*Math.PI/180;
+        zr.set([Math.cos(g), Math.sin(g)], j*2);
+        const so = [hh2(L.seed, i + 50)*40, hh2(L.seed, i + 90)*40, hh2(L.seed, i + 130)*40];
+        let off;
+        if(M.loop){ const Rr = P.flow*ts*Math.sqrt(3)*dur/TAU, th0 = TAU*frm/total + ph; off = [so[0] + Rr*Math.cos(th0), so[1] + Rr*Math.sin(th0), so[2] + Rr*Math.cos(th0 + 2)]; }
+        else { const tt = P.flow*ts*frm/M.fps; off = [so[0] + tt, so[1] + tt, so[2] + tt]; }
+        const pul = Math.sin(motionAngle(P.pulse*ts, L, frm) + ph*2.3)*P.wobble;
+        fl.set([off[0], off[1], off[2], pul], j*4);
+        const rgb = hex2rgb(L.palette[c.col]);
+        co.set([rgb[0]*c.bright, rgb[1]*c.bright, rgb[2]*c.bright, 1], j*4);
+      });
+      gl.viewport(0, 0, tw, th);
+      f2('uFull', W, H); f2('uOff', ox, H - (oy + th));
+      i1('uN', act.length); i1('uSteps', P.steps);
+      i1('uView', vw === 'nebula' ? 1 : vw === 'bg' ? 2 : 0);
+      i1('uBlend', P.blend === 'screen' ? 1 : P.blend === 'over' ? 2 : 0);
+      i1('uBgMode', ['solid','linear','linear3','radial','corners'].indexOf(P.bgMode));
+      U.uZr && gl.uniform2fv(U.uZr, zr); v4('uCen', cen); v4('uCS', cs); v4('uFl', fl); v4('uCol', co);
+      f2('uStretch', P.stretchX, P.stretchY);
+      f1('uFreq', P.freq); f1('uTurb', P.turb); f1('uDetail', P.detail); f1('uDetScale', P.detScale);
+      f1('uBody', P.body); f1('uLogMix', P.logMix); f1('uMerge', P.merge); f1('uColSharp', P.colSharp);
+      f1('uFov', P.zoom); f1('uPersp', P.persp); f1('uLim', P.wideFix ? 0.8889 : 0); i1('uPulseMode', P.pulseMode === 'swing' ? 1 : 0); f1('uCamZ', camZ); f1('uStart', P.start); f1('uMaxStep', P.maxStep); f1('uReach', P.reach); f1('uDensity', P.density);
+      const az = P.lightAz*Math.PI/180, el = P.lightEl*Math.PI/180;
+      f3('uLight', [Math.cos(el)*Math.cos(az)*P.shade, Math.sin(el)*P.shade, Math.cos(el)*Math.sin(az)*P.shade]);
+      f3('uShadow', hex2rgb(L.palette[L.idx[4]]).map(v => v*P.shadowAmt));
+      f1('uGain', P.gain); f1('uExposure', P.exposure); f1('uSat', P.sat); f1('uContrast', P.contrast); f1('uHue', P.hue*Math.PI/180); f1('uOverK', P.overK);
+      i1('uTone', P.tone ? 1 : 0); i1('uTransparent', P.transparent ? 1 : 0); i1('uDimOn', P.dimOn ? 1 : 0); i1('uBgEase', P.bgEase ? 1 : 0);
+      f1('uDimAmt', P.dimAmt); f1('uDimIn', P.dimIn); f1('uDimOut', P.dimOut); f1('uVig', P.vig); f1('uGrain', P.grain);
+      f1('uGrainPx', Math.max(0.05, P.grainSize*W/refW)); f1('uFrame', frm % 4096);
+      for(let k = 0; k < 4; k++) f3('uBg' + (k + 1), hex2rgb(L.palette[L.idx[k]]));
+      f1('uBgAngle', P.bgAngle*Math.PI/180); f1('uBgScale', P.bgScale);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      return act.length;
+    }};
+}
+
+let PG, RG;
+const cv = document.getElementById('cv');
+try{
+  PG = makeRenderer(cv);
+  const rc = document.createElement('canvas'); RG = makeRenderer(rc);
+  rc.width = RG.tile; rc.height = RG.tile;
+}catch(err){
+  document.body.append(h('div', {class:'fatal'}, h('div', {}, h('p', {text:'FICAGEB Liquid cannot start.'}), h('p', {class:'muted', text:err.message}))));
+  throw err;
+}
+function makeCanvas(w, hgt, dom){ if(!dom && typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, hgt); const c = document.createElement('canvas'); c.width = w; c.height = hgt; return c; }
+/* Renders the region (ox, oy, cw, ch) of a W×H frame into a 2D canvas, tile by tile, with straight alpha. */
+function renderRegion(L, frm, W, H, ox, oy, cw, ch, vw = 'result', refW = W, dom = false){
+  const out = makeCanvas(cw, ch, dom), octx = out.getContext('2d'), gl = RG.gl, T = RG.tile;
+  for(let ty = 0; ty < ch; ty += T) for(let tx = 0; tx < cw; tx += T){
+    const tw = Math.min(T, cw - tx), th = Math.min(T, ch - ty);
+    RG.draw(L, frm, W, H, ox + tx, oy + ty, tw, th, vw, refW);
+    const px = new Uint8ClampedArray(tw*th*4); gl.readPixels(0, 0, tw, th, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const fl = new Uint8ClampedArray(tw*th*4), row = tw*4;
+    for(let y = 0; y < th; y++) fl.set(px.subarray((th - 1 - y)*row, (th - y)*row), y*row);
+    octx.putImageData(new ImageData(fl, tw, th), tx, ty);
+  }
+  return out;
+}
+
+/* ================= left panel ================= */
+const left = $('#left');
+const stage = $('#stage');
+const hWrap = $('#handles');
+let cSync = [], cBuilt = null, hEls = [];
+const liveOff = [];
+const only = (cond, el) => { reg(() => { el.style.display = cond() ? '' : 'none'; }); return el; };
+const W = k => widget(DEF[k]);
+function previewSize(w){ return [w, Math.max(24, Math.min(w, Math.round(w*R.h/R.w)))]; }
+function smallRender(w, L = look, frm = frame){ const [Wd, Hd] = previewSize(w); return renderRegion(L, frm, Wd, Hd, 0, 0, Wd, Hd, 'result', R.w, true); }
+
+function randomCenters(n){
+  const out = [];
+  for(let i = 0; i < n; i++){
+    let best = null;
+    for(let tries = 0; tries < 30; tries++){
+      const c = {x:Math.random()*1.5 - 0.75, y:Math.random()*1.2 - 0.6};
+      const dmin = out.reduce((m, o) => Math.min(m, Math.hypot(o.x - c.x, o.y - c.y)), 9);
+      if(!best || dmin > best.d) best = {c, d:dmin};
+    }
+    out.push(mkC({x:best.c.x, y:best.c.y, size:0.45 + Math.random()*0.5, col:2 + Math.floor(Math.random()*4), phase:Math.round(Math.random()*360), speed:0.7 + Math.random()*0.6}));
+  }
+  return out;
+}
+function randomize(){
+  if(!locks.has('seed')) look.seed = Math.floor(Math.random()*99999);
+  for(const d of DEFS){ if(!d.rnd || locks.has(d.k)) continue; let v = d.rnd[0] + Math.random()*(d.rnd[1] - d.rnd[0]); if(d.int) v = Math.round(v); look.params[d.k] = v; }
+  if(!locks.has('centers')) look.centers = randomCenters(1 + Math.floor(Math.random()*4));
+  syncAll(); changed();
+}
+function jitterLook(base, amt){
+  const L = clone(base);
+  if(!locks.has('seed')) L.seed = Math.floor(Math.random()*99999);
+  for(const d of DEFS){ if(!d.rnd || locks.has(d.k)) continue; let v = L.params[d.k] + (Math.random()*2 - 1)*(d.rnd[1] - d.rnd[0])*amt; v = clamp(v, d.min, d.max); if(d.int) v = Math.round(v); L.params[d.k] = v; }
+  if(!locks.has('centers')) for(const c of L.centers){ c.x = clamp(c.x + (Math.random()*2 - 1)*amt, -1.5, 1.5); c.y = clamp(c.y + (Math.random()*2 - 1)*amt, -1.5, 1.5); c.size = clamp(c.size*(1 + (Math.random()*2 - 1)*amt), 0.1, 3); }
+  return L;
+}
+function makeVariations(grid){
+  if(rendering) return;
+  grid.replaceChildren();
+  for(let i = 0; i < 6; i++){
+    const L = jitterLook(look, 0.15);
+    grid.append(h('button', {type:'button', title:`Seed ${L.seed}. Click to use this variation`, onclick:() => { look = L; syncAll(); changed(); toast('Variation applied'); }}, smallRender(260, L)));
+  }
+}
+
+/* Look */
+{
+  let usePal = true;
+  const startGrid = h('div', {class:'starters'});
+  for(const [name, st] of Object.entries(STARTERS)){
+    startGrid.append(h('button', {type:'button', text:name, onclick:() => {
+      const L = clone(look);
+      L.params = Object.assign(DEFAULT_LOOK().params, st.p || {});
+      L.centers = (st.c || [{}]).map(mkC);
+      if(usePal){ L.palette = [...(st.pal || DEFAULT_PALETTE)]; L.idx = [...(st.idx || DEFAULT_IDX)]; }
+      look = normalizeLook(L); syncAll(); changed(); toast(`Starting point "${name}" applied`);
+    }}));
+  }
+  const seedF = numField({get:() => look.seed, set:v => { look.seed = v; changed(); }, min:0, max:99999, step:1, int:true, dragUnit:1});
+  reg(() => seedF.sync());
+  const varGrid = h('div', {class:'vars'});
+  const palIn = h('input', {type:'checkbox'}); palIn.checked = true; palIn.addEventListener('change', () => { usePal = palIn.checked; });
+  left.append(section('Look', true,
+    h('span', {class:'muted', text:'Starting points (keep your motion settings)'}), startGrid,
+    h('label', {class:'switch'}, palIn, h('span', {class:'track'}), h('span', {text:'Use the starter colors too'})),
+    h('div', {class:'row'}, lockBtn('seed'), h('span', {class:'lab', text:'Seed'}), h('span'), seedF),
+    h('div', {class:'row'}, lockBtn('centers'), h('span', {class:'lab', text:'Centers'}), h('span', {class:'muted', text:'Lock to keep them when randomizing'})),
+    h('div', {class:'btns'}, btn('New seed', () => { look.seed = Math.floor(Math.random()*99999); syncAll(); changed(); }), btn('Randomize', randomize), btn('Variations', () => makeVariations(varGrid))),
+    h('p', {class:'hint', text:'Locked values stay put when you randomize or make variations. The seed changes each center\'s phase and turbulence.'}),
+    varGrid));
+}
+
+/* Centers */
+{
+  const cList = h('div', {class:'sec-body', style:'padding:0;gap:6px'});
+  const countInfo = h('span', {class:'muted'});
+  const addB = btn('Add center', () => {
+    if(look.centers.length >= MAXC){ toast(`Up to ${MAXC} centers`); return; }
+    const c = randomCenters(1)[0]; c.col = 2 + look.centers.length % 5; c.wigA = 0.08;
+    look.centers.push(c); changed(); syncAll();
+  }, 'primary');
+  function cRow(c, k, l, min, max, step, int){
+    const rng = h('input', {type:'range', min, max, step, 'aria-label':l});
+    const num = numField({get:() => c[k], set:v => { c[k] = v; rng.value = v; changed(); cSync.forEach(f => f()); syncHandles(); }, min, max, step, int});
+    rng.addEventListener('input', () => { c[k] = +rng.value; num.sync(); changed(); cSync.forEach(f => f()); syncHandles(); });
+    cSync.push(() => { rng.value = c[k]; num.sync(); });
+    return h('div', {class:'row nolock'}, h('span', {class:'lab', text:l, title:l}), rng, num);
+  }
+  function buildCenters(){
+    cBuilt = look.centers; cSync = []; cList.replaceChildren();
+    look.centers.forEach((c, i) => {
+      const chip = h('span', {class:'chip'}), pos = h('span', {class:'pos'}), vInfo = h('p', {class:'hint'});
+      const onIn = h('input', {type:'checkbox'});
+      onIn.addEventListener('change', () => { c.on = onIn.checked; changed(); cSync.forEach(f => f()); syncHandles(); });
+      const pick = h('div', {class:'colpick'}, h('span', {class:'lab', text:'Color'}));
+      const pbs = look.palette.map((_, k) => { const b = h('button', {type:'button', title:`Palette color ${k + 1}`, onclick:() => { c.col = k; changed(); cSync.forEach(f => f()); syncHandles(); }}); pick.append(b); return b; });
+      const det = h('details', {class:'cen', open:look.centers.length <= 2 ? '' : null},
+        h('summary', {}, chip, h('span', {class:'nm', text:`Center ${i + 1}`}), pos,
+          h('button', {class:'x', type:'button', title:'Remove this center', text:'×', onclick:e => {
+            e.preventDefault(); e.stopPropagation();
+            if(look.centers.length <= 1){ toast('Keep at least one center'); return; }
+            look.centers.splice(i, 1); changed(); syncAll();
+          }})),
+        h('div', {class:'cbody'},
+          h('label', {class:'switch'}, onIn, h('span', {class:'track'}), h('span', {text:'Visible'})),
+          pick,
+          cRow(c, 'x', 'Position X', -1.5, 1.5, 0.01), cRow(c, 'y', 'Position Y', -1.5, 1.5, 0.01),
+          cRow(c, 'size', 'Size', 0.1, 3, 0.01), cRow(c, 'bright', 'Brightness', 0, 3, 0.01),
+          cRow(c, 'speed', 'Speed ×', 0, 4, 0.01), cRow(c, 'phase', 'Phase °', 0, 360, 1),
+          cRow(c, 'driftR', 'Drift radius', 0, 0.6, 0.005), cRow(c, 'driftS', 'Drift speed', -2, 2, 0.01),
+          cRow(c, 'wigA', 'Hover amount', 0, 0.8, 0.005), cRow(c, 'wigS', 'Hover speed', 0, 4, 0.01),
+          cRow(c, 'wigSize', 'Size breathing', 0, 0.8, 0.01),
+          cRow(c, 'rot', 'Rotation speed', -2, 2, 0.01), cRow(c, 'angle', 'Start angle °', -180, 180, 1),
+          vInfo,
+          h('button', {class:'btn', type:'button', text:'Duplicate', onclick:() => {
+            if(look.centers.length >= MAXC){ toast(`Up to ${MAXC} centers`); return; }
+            const d = mkC(clone(c)); d.x = clamp(d.x + 0.15, -1.5, 1.5); d.y = clamp(d.y - 0.1, -1.5, 1.5); d.phase = (d.phase + 97) % 360;
+            look.centers.splice(i + 1, 0, d); changed(); syncAll();
+          }})));
+      cSync.push(() => {
+        chip.style.background = look.palette[c.col]; onIn.checked = c.on; det.classList.toggle('dis', !c.on);
+        pos.textContent = `${c.x.toFixed(2)}, ${c.y.toFixed(2)}`;
+        const P = look.params, v = centerVar(look, i);
+        const rs = rotSpeed(look, c, i), rTxt = Math.abs(rs) < 1e-4 ? 'no rotation' : `rotation ${Math.abs(rs/P.timeScale || 0).toFixed(2)} ${rs > 0 ? 'CCW' : 'CW'}${look.motion.loop ? ` (${Math.abs(loopTurns(rs, look))} turn${Math.abs(loopTurns(rs, look)) === 1 ? '' : 's'} per loop)` : ''}`;
+        vInfo.textContent = (P.speedVar || P.hoverVar || P.hoverAmtVar || P.rotVar || P.rotMix || P.rotBase || c.rot) ? `Effective: speed ×${(c.speed*v.sp).toFixed(2)}, hover speed ${(c.wigS*v.hs).toFixed(2)}, hover amount ${((P.hoverBase + c.wigA)*v.ha).toFixed(3)}, ${rTxt}` : '';
+        pbs.forEach((b, k) => { b.style.background = look.palette[k]; b.classList.toggle('on', k === c.col); });
+      });
+      cList.append(det);
+    });
+  }
+  reg(() => {
+    if(cBuilt !== look.centers || cList.childElementCount !== look.centers.length) buildCenters();
+    cSync.forEach(f => f());
+    countInfo.textContent = `${look.centers.length} of ${MAXC}`;
+    addB.disabled = look.centers.length >= MAXC;
+    syncHandles();
+  });
+  left.append(section('Centers', true,
+    h('p', {class:'hint', text:'Each center is one liquid body. Drag a numbered handle to move it, drag the small square on its ring or scroll over it to resize. Position ±1 is the frame edge. Handles follow their center as it moves; the small cross is the anchor it moves around. Drift circles the anchor (dashed ring). Hover wanders randomly around it (dotted ring shows the rough reach).'}),
+    h('div', {class:'btns'}, addB, countInfo),
+    h('div', {class:'btns'},
+      btn('Scatter', () => { look.centers.forEach(c => { const r = randomCenters(1)[0]; c.x = r.x; c.y = r.y; }); changed(); syncAll(); }),
+      btn('Spread colors', () => { look.centers.forEach((c, i) => c.col = 2 + i % 5); changed(); syncAll(); }),
+      btn('Row', () => { const n = look.centers.length; look.centers.forEach((c, i) => { c.x = n === 1 ? 0 : -0.8 + 1.6*i/(n - 1); c.y = 0; }); changed(); syncAll(); }),
+      btn('Ring', () => { const n = look.centers.length; look.centers.forEach((c, i) => { const a = TAU*i/n + Math.PI/2; c.x = n === 1 ? 0 : Math.cos(a)*0.6*R.h/R.w; c.y = n === 1 ? 0 : Math.sin(a)*0.6; }); changed(); syncAll(); })),
+    cList));
+}
+
+left.append(section('Shape', true, h('p', {class:'hint', text:'Liquid merge melts nearby centers into one body; 0 keeps them separate. Color separation sets how sharply each center keeps its own color where bodies meet.'}),
+  ...widgets('shape')));
+left.append(section('Turbulence', true, h('p', {class:'hint', text:'The rippling surface inside each body. Fine detail adds a second, smaller layer of ripples.'}), ...widgets('turb')));
+
+{
+  const durF = numField({get:() => look.motion.dur, set:v => { look.motion.dur = v; changed(); syncAll(); }, min:1, max:600, step:0.5, dec:1, dragUnit:0.1});
+  const fpsF = numField({get:() => look.motion.fps, set:v => { look.motion.fps = v; changed(); syncAll(); }, min:1, max:120, step:1, int:true, dragUnit:0.25});
+  const loopNote = h('p', {class:'hint'});
+  afterParam = () => {
+    cSync.forEach(f => f());
+    const P = look.params, L = look;
+    if(!L.motion.loop){ loopNote.textContent = 'Free-running: motion keeps going and the last frame does not match the first.'; return; }
+    const t = s => loopTurns(s*P.timeScale, L);
+    loopNote.textContent = `Seamless loop: frame ${totalFrames()} flows back into frame 0. Per loop at Speed × 1: tumble ${t(P.spinX)} turns, roll ${t(P.spinY)} turns, pulse ${t(P.pulse)} cycles. Speeds snap to whole turns.`;
+  };
+  reg(() => { durF.sync(); fpsF.sync(); afterParam(); });
+  left.append(section('Motion', true,
+    toggle('Loop (seamless)', () => look.motion.loop, v => look.motion.loop = v, true), loopNote,
+    h('div', {class:'row nolock'}, h('span', {class:'lab', text:'Duration s'}), h('span'), durF),
+    h('div', {class:'row nolock'}, h('span', {class:'lab', text:'Frame rate'}), h('span'), fpsF),
+    h('p', {class:'hint', text:'Tumble and roll turn each body in 3D. Pulse breathes the body in and out. Flow moves the ripples through it. Overall speed scales everything, including drift.'}),
+    ...widgets('motion'),
+    h('p', {class:'hint', text:'Rotation turns each whole body in the frame plane: positive is counterclockwise, negative clockwise. Each center has its own Rotation speed; the values here add to it and scale it. In a loop, rotations land on whole turns per loop (at least one).'}),
+    h('p', {class:'hint', text:'Variations give every center its own multiplier on top of its own settings, so each one moves at a different pace. Speed variation covers tumble, roll, pulse, flow and drift. Hover speed never snaps in a loop; tumble and roll still land on whole turns.'}),
+    h('div', {class:'btns'}, btn('Shuffle variation', () => { look.params.varSeed = Math.floor(Math.random()*9999); syncAll(); changed(); }))));
+}
+left.append(section('Ray marching', false, h('p', {class:'hint', text:'More march steps give denser, more detailed bodies and cost more render time. Glow reach and density control the soft halo. The light sets where the bright edge sits. Wide frame correction keeps bodies at the far left and right of wide LED formats as bright and round as in the middle; frames up to 16:9 look the same either way. Lower Perspective for a flatter look.'}), ...widgets('camera')));
+{
+  const ws = widgets('finish');
+  DEFS.filter(d => d.s === 'finish').forEach((d, i) => { if(/^dim(Amt|In|Out)$/.test(d.k)) only(() => look.params.dimOn, ws[i]); });
+  left.append(section('Finishing', false, h('p', {class:'hint', text:'Center dimming darkens the middle of the frame to keep room for text. Radii are shares of half the short side.'}), ...ws));
+}
+
+/* ================= viewport + timeline ================= */
+/* Handles ride on the moving centers. The small cross marks the anchor you placed;
+   the dashed ring around it is the drift circle, the dotted ring roughly how far hover wanders. */
+function hoverReach(c){ return look.params.hoverBase + c.wigA; }
+function syncHandles(){
+  if(hEls.length !== look.centers.length){
+    hWrap.replaceChildren();
+    hEls = look.centers.map((_, i) => {
+      const anc = h('span', {class:'anc'}), ring = h('span', {class:'ring'}), reach = h('span', {class:'ring reach'});
+      const size = h('span', {class:'szr'}), grip = h('span', {class:'grip', title:'Drag to resize'});
+      const el = h('button', {class:'hd', type:'button', 'aria-label':`Center ${i + 1}. Drag or use arrow keys to move, scroll or plus and minus to resize`}, String(i + 1), grip);
+      bindDrag(el, i); bindSize(el, grip, i); hWrap.append(ring, reach, anc, size, el); return {el, anc, ring, reach, size, grip};
+    });
+  }
+  const r = stage.getBoundingClientRect(), mn = Math.min(r.width, r.height);
+  look.centers.forEach((c, i) => {
+    const {anc, ring, reach} = hEls[i], col = look.palette[c.col];
+    const ax = ((c.x + 1)/2*100) + '%', ay = ((1 - c.y)/2*100) + '%';
+    const wa = hoverReach(c)*centerVar(look, i).ha*look.params.wigAll, moving = c.driftR > 0 || wa > 0;
+    anc.style.left = ax; anc.style.top = ay; anc.style.color = col; anc.style.display = moving && c.on ? '' : 'none';
+    const place = (el, rad, show) => { el.style.display = show ? '' : 'none'; el.style.left = ax; el.style.top = ay; el.style.width = el.style.height = 2*rad + 'px'; el.style.margin = `${-rad}px 0 0 ${-rad}px`; };
+    place(ring, c.driftR*mn, c.on && c.driftR > 0);
+    place(reach, (c.driftR + wa*1.1)*mn, c.on && wa > 0);
+  });
+  syncLive();
+}
+/* Approximate on-screen radius of a body of size 1: solve r * mix(1, log(r + 1), falloff) = body size. */
+function bodyRadius(P){
+  let lo = 0, hi = 12;
+  for(let k = 0; k < 30; k++){ const m = (lo + hi)/2, v = m*mix(1, Math.log(m + 1), P.logMix); if(v < P.body) lo = m; else hi = m; }
+  return lo;
+}
+function sizePx(c, r){ const P = look.params; return bodyRadius(P)*c.size*P.scale/(P.zoom*5)*Math.min(r.width, r.height); }
+function syncLive(){
+  if(hEls.length !== look.centers.length) return;
+  const r = stage.getBoundingClientRect();
+  look.centers.forEach((c, i) => {
+    const st = centerState(look, c, i, frame, R.w, R.h), {el, size, grip} = hEls[i], col = look.palette[c.col];
+    const fx = st.ux/st.hx, fy = st.uy/st.hy;
+    liveOff[i] = [fx - c.x, fy - c.y];
+    const lx = ((fx + 1)/2*100) + '%', ly = ((1 - fy)/2*100) + '%';
+    el.style.left = lx; el.style.top = ly; el.style.borderColor = col; el.classList.toggle('off', !c.on);
+    const rx = sizePx(c, r)*st.sz*look.params.stretchX, ry = sizePx(c, r)*st.sz*look.params.stretchY;
+    size.style.left = lx; size.style.top = ly; size.style.width = 2*rx + 'px'; size.style.height = 2*ry + 'px';
+    size.style.margin = `${-ry}px 0 0 ${-rx}px`; size.style.borderColor = col; size.style.display = c.on ? '' : 'none';
+    const g = motionAngle(rotSpeed(look, c, i), look, frame) + c.angle*Math.PI/180;
+    size.style.transform = `rotate(${-g}rad)`;
+    grip.style.left = `calc(50% + ${rx*Math.cos(g)}px - 4px)`; grip.style.top = `calc(50% - ${rx*Math.sin(g)}px - 4px)`; grip.style.background = col;
+  });
+}
+function bindSize(el, grip, i){
+  const setSize = v => { const c = look.centers[i]; if(!c) return; c.size = clamp(v, 0.1, 3); changed(); cSync.forEach(f => f()); syncHandles(); };
+  let drag = false;
+  grip.addEventListener('pointerdown', e => { e.stopPropagation(); e.preventDefault(); grip.setPointerCapture(e.pointerId); drag = true; });
+  grip.addEventListener('pointermove', e => {
+    if(!drag) return; const c = look.centers[i]; if(!c) return;
+    const r = stage.getBoundingClientRect(), b = el.getBoundingClientRect();
+    const dist = Math.max(2, Math.hypot(e.clientX - (b.left + b.width/2), e.clientY - (b.top + b.height/2)));
+    const st = centerState(look, c, i, frame, R.w, R.h);
+    setSize(dist/(sizePx({size:1}, r)*st.sz*look.params.stretchX));
+  });
+  grip.addEventListener('pointerup', () => { drag = false; });
+  grip.addEventListener('click', e => e.stopPropagation());
+  el.addEventListener('wheel', e => { e.preventDefault(); const c = look.centers[i]; if(c) setSize(c.size*Math.exp(-e.deltaY*0.0015)); }, {passive:false});
+  el.addEventListener('keydown', e => { const c = look.centers[i]; if(!c) return; if(e.key === '+' || e.key === '='){ e.preventDefault(); setSize(c.size*1.05); } if(e.key === '-'){ e.preventDefault(); setSize(c.size/1.05); } });
+}
+/* Dragging a moving handle moves its anchor, keeping the handle under the pointer. */
+function bindDrag(el, i){
+  let drag = null;
+  const move = (c, x, y) => { c.x = clamp(x, -1.5, 1.5); c.y = clamp(y, -1.5, 1.5); changed(); cSync.forEach(f => f()); syncHandles(); };
+  el.addEventListener('pointerdown', e => {
+    if(e.target !== el) return;
+    e.stopPropagation(); e.preventDefault(); el.setPointerCapture(e.pointerId); el.focus();
+    drag = {off:[...(liveOff[i] || [0, 0])]};
+  });
+  el.addEventListener('pointermove', e => {
+    if(!drag) return; const c = look.centers[i]; if(!c) return;
+    const r = stage.getBoundingClientRect();
+    move(c, ((e.clientX - r.left)/r.width)*2 - 1 - drag.off[0], 1 - ((e.clientY - r.top)/r.height)*2 - drag.off[1]);
+  });
+  el.addEventListener('pointerup', () => { drag = null; });
+  el.addEventListener('click', e => e.stopPropagation());
+  el.addEventListener('keydown', e => {
+    const c = look.centers[i]; if(!c) return;
+    const st = e.shiftKey ? 0.1 : 0.01, k = {ArrowLeft:[-st, 0], ArrowRight:[st, 0], ArrowUp:[0, st], ArrowDown:[0, -st]}[e.key];
+    if(k){ e.preventDefault(); move(c, c.x + k[0], c.y + k[1]); }
+  });
+}
+function layoutStage(){
+  const vp = $('#viewport').getBoundingClientRect();
+  const aw = Math.max(50, vp.width - 36), ah = Math.max(50, vp.height - 36), ar = R.w/R.h;
+  let w = aw, hgt = aw/ar; if(hgt > ah){ hgt = ah; w = ah*ar; }
+  stage.style.width = w + 'px'; stage.style.height = hgt + 'px';
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(2, Math.min(PG.tile*2, Math.round(w*dpr*previewQ))); cv.height = Math.max(2, Math.min(PG.tile*2, Math.round(hgt*dpr*previewQ)));
+  syncHandles();
+  dirty = true;
+}
+new ResizeObserver(layoutStage).observe($('#viewport'));
+reg(() => stage.classList.toggle('alpha', !!look.params.transparent));
+const tl = $('#timeline');
+const playB = btn('Pause', togglePlay);
+const scrub = h('input', {type:'range', min:0, max:1, step:1, value:0, 'aria-label':'Timeline'});
+const tc = h('span', {class:'tc'});
+const pq = h('select', {'aria-label':'Preview quality'}, ...[25, 50, 75, 100].map(v => h('option', {value:v/100, text:`Preview ${v}%`})));
+pq.value = '0.5'; pq.addEventListener('change', () => { previewQ = +pq.value; layoutStage(); });
+const viewSel = h('select', {'aria-label':'View'}, h('option', {value:'result', text:'View: Result'}), h('option', {value:'nebula', text:'View: Liquid only'}), h('option', {value:'bg', text:'View: Background only'}));
+viewSel.addEventListener('change', () => { view = viewSel.value; dirty = true; });
+const safeT = h('label', {class:'switch'}, h('input', {type:'checkbox', onchange:e => { $('#safe').hidden = !e.target.checked; }}), h('span', {class:'track'}), h('span', {text:'Safe zones'}));
+const hIn = h('input', {type:'checkbox', onchange:e => { hWrap.hidden = !e.target.checked; }}); hIn.checked = true;
+const handT = h('label', {class:'switch'}, hIn, h('span', {class:'track'}), h('span', {text:'Handles'}));
+const cropB = btn('1:1 crop', () => { picking = !picking; stage.classList.toggle('picking', picking); cropB.classList.toggle('primary', picking); if(picking) toast('Click the preview where you want to inspect full resolution'); });
+const pfps = h('span', {class:'muted'});
+tl.append(playB, scrub, tc, viewSel, pq, safeT, handT, cropB, pfps);
+scrub.addEventListener('input', () => { frame = +scrub.value; tAcc = frame/look.motion.fps; dirty = true; });
+function togglePlay(){ playing = !playing; playB.textContent = playing ? 'Pause' : 'Play'; }
+function updateTimeline(){
+  const total = totalFrames(); scrub.max = total - 1; scrub.value = frame;
+  const fps = look.motion.fps, s = Math.floor(frame/fps), f = frame % fps;
+  tc.innerHTML = `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}:${String(f).padStart(2,'0')} <small>frame ${frame} / ${total - 1}</small>`;
+}
+document.addEventListener('keydown', e => { if(e.code === 'Space' && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(e.target.tagName)){ e.preventDefault(); togglePlay(); } });
+stage.addEventListener('click', e => {
+  if(!picking) return;
+  picking = false; stage.classList.remove('picking'); cropB.classList.remove('primary');
+  const r = stage.getBoundingClientRect();
+  const cx = (e.clientX - r.left)/r.width*R.w, cy = (e.clientY - r.top)/r.height*R.h;
+  const cw = Math.min(R.w, 1280), ch = Math.min(R.h, 720);
+  const x = Math.round(clamp(cx - cw/2, 0, R.w - cw)), y = Math.round(clamp(cy - ch/2, 0, R.h - ch));
+  const c = renderRegion(look, frame, R.w, R.h, x, y, cw, ch, view, R.w, true);
+  $('#cropBody').replaceChildren(c);
+  $('#cropTitle').textContent = `1:1 crop of ${R.w}×${R.h} at x ${x}, y ${y}, frame ${frame}`;
+  $('#cropModal').hidden = false;
+});
+$('#cropClose').addEventListener('click', () => $('#cropModal').hidden = true);
+$('#cropModal').addEventListener('click', e => { if(e.target.id === 'cropModal') e.target.hidden = true; });
+
+let last = performance.now(), fpsN = 0, fpsT = 0, nAct = 0;
+function tick(now){
+  const dt = Math.min(0.25, (now - last)/1000); last = now;
+  if(playing && !rendering){
+    tAcc += dt;
+    const f = Math.floor(tAcc*look.motion.fps) % totalFrames();
+    if(f !== frame){ frame = f; dirty = true; }
+  }
+  if(dirty && !rendering){
+    try{ nAct = PG.draw(look, frame, cv.width, cv.height, 0, 0, cv.width, cv.height, view, R.w); }catch(err){ console.error(err); }
+    dirty = false; updateTimeline(); if(!hWrap.hidden) syncLive(); fpsN++;
+  }
+  fpsT += dt; if(fpsT > 1){ pfps.textContent = rendering ? 'Rendering' : `${fpsN} fps`; $('#perf').textContent = `${nAct} visible center${nAct === 1 ? '' : 's'}, ${look.params.steps} march steps, preview ${cv.width}×${cv.height}`; fpsN = 0; fpsT = 0; }
+  requestAnimationFrame(tick);
+}
+
+/* ================= right panel ================= */
+const right = $('#right');
+const tabs = h('div', {class:'tabs', role:'tablist'});
+const panes = {};
+['Color', 'Library', 'Render'].forEach((name, i) => {
+  const pane = h('div', {class:'tabpane', role:'tabpanel'}); pane.hidden = i !== 0; panes[name] = pane;
+  const b = h('button', {class:i === 0 ? 'active' : '', role:'tab', type:'button', text:name, onclick:() => {
+    tabs.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active');
+    Object.values(panes).forEach(p => p.hidden = true); pane.hidden = false;
+  }});
+  tabs.append(b);
+});
+right.append(tabs, ...Object.values(panes));
+
+/* Color tab */
+{
+  const pal = h('div', {class:'palette'});
+  for(let i = 0; i < 7; i++){
+    const ci = h('input', {type:'color', 'aria-label':`Color ${i + 1}`});
+    const hx = h('input', {class:'hex', type:'text', spellcheck:'false', 'aria-label':`Color ${i + 1} hex`});
+    const apply = v => { look.palette[i] = v.toLowerCase(); syncAll(); changed(); };
+    ci.addEventListener('input', () => apply(ci.value));
+    hx.addEventListener('change', () => { let v = hx.value.trim(); if(!v.startsWith('#')) v = '#' + v; if(/^#[0-9a-f]{6}$/i.test(v)) apply(v); else hx.value = look.palette[i]; });
+    reg(() => { ci.value = look.palette[i]; if(document.activeElement !== hx) hx.value = look.palette[i]; });
+    pal.append(h('div', {class:'sw'}, h('b', {text:String(i + 1)}), ci, hx));
+  }
+  const setName = h('input', {class:'txt', placeholder:'Palette set name, e.g. Client X brand'});
+  const setList = h('div', {class:'chips'});
+  let sets = store.get('ficageb.palettes', []);
+  const drawSets = () => {
+    setList.replaceChildren(...(sets.length ? sets.map((s, k) => h('div', {class:'pset', title:'Apply this palette', onclick:() => { look.palette = [...s.colors]; syncAll(); changed(); toast(`Palette "${s.name}" applied`); }},
+      h('i', {}, ...s.colors.map(c => { const sp = h('span'); sp.style.background = c; return sp; })),
+      h('span', {text:s.name}),
+      h('button', {class:'x', type:'button', title:'Delete palette set', text:'×', onclick:e => { e.stopPropagation(); sets.splice(k, 1); store.set('ficageb.palettes', sets); drawSets(); }}))) : [h('p', {class:'empty', text:'No palette sets yet.'})]));
+  };
+  drawSets();
+  const els = h('div', {class:'sec-body', style:'padding:0;gap:5px'});
+  els.append(h('div', {class:'erow3', style:'color:var(--muted);font-size:11px'}, h('span', {text:'Element'}), h('span'), h('span', {text:'Color #', style:'text-align:center'})));
+  ELEMENTS.forEach((name, k) => {
+    const chip = h('span', {class:'chip'});
+    const idxF = numField({get:() => look.idx[k] + 1, set:v => { look.idx[k] = v - 1; chip.style.background = look.palette[look.idx[k]]; changed(); }, min:1, max:7, step:1, int:true, dragUnit:0.1});
+    reg(() => { chip.style.background = look.palette[look.idx[k]]; idxF.sync(); });
+    els.append(h('div', {class:'erow3'}, h('span', {class:'lab', text:name}), chip, idxF));
+  });
+  const gw = widgets('grade');
+  DEFS.filter(d => d.s === 'grade').forEach((d, i) => { if(d.k === 'overK') only(() => look.params.blend === 'over' && !look.params.transparent, gw[i]); if(d.k === 'blend') only(() => !look.params.transparent, gw[i]); });
+  const bw = widgets('bg');
+  DEFS.filter(d => d.s === 'bg').forEach((d, i) => {
+    if(d.k === 'bgAngle') only(() => /^linear/.test(look.params.bgMode), bw[i]);
+    if(d.k === 'bgScale') only(() => look.params.bgMode === 'radial', bw[i]);
+    if(d.k === 'bgEase') only(() => look.params.bgMode !== 'solid', bw[i]);
+  });
+  const bgHint = h('p', {class:'hint'});
+  reg(() => {
+    const m = look.params.bgMode;
+    bgHint.textContent = look.params.transparent ? 'Transparent background is on, so the background is not rendered.' :
+      m === 'solid' ? 'Uses Background 1.' : m === 'linear' ? 'Background 1 to Background 2. Angle 90 runs bottom to top.' :
+      m === 'linear3' ? 'Background 1, 2 and 3 in a row. Angle 90 runs bottom to top.' : m === 'radial' ? 'Background 1 in the middle, Background 2 at the edges.' :
+      'Background 1 top left, 2 top right, 3 bottom left, 4 bottom right.';
+  });
+  const cres = h('p', {class:'hint'});
+  panes.Color.append(
+    section('Palette', true, pal, h('p', {class:'hint', text:'Centers pick their color from these 7. The elements below use them by number.'})),
+    section('Elements', true, els, h('p', {class:'hint', text:'Shadow tone tints the dark side of every body.'})),
+    section('Glow and grade', true, h('p', {class:'hint', text:'Add suits dark backgrounds. Over keeps the liquid visible on light backgrounds. Transparent exports the liquid alone with alpha, for After Effects; use Add or Screen there.'}), ...gw),
+    section('Background', true, bgHint, ...bw),
+    section('Palette sets', false, h('div', {class:'btns', style:'flex-wrap:nowrap'}, setName, btn('Save', () => {
+      const n = setName.value.trim() || `Palette ${sets.length + 1}`;
+      sets.push({name:n, colors:[...look.palette]}); store.set('ficageb.palettes', sets); setName.value = ''; drawSets(); toast(`Palette "${n}" saved`);
+    })), setList, h('p', {class:'hint', text:'Shared with the other FICAGEB generators in this browser.'})),
+    section('Text contrast', false, h('p', {class:'hint', text:'Checks the lower-third safe zone at the current frame.'}), btn('Check contrast', () => {
+      const c = smallRender(320), Wd = c.width, Hd = c.height;
+      const x = Math.round(Wd*0.05), y = Math.round(Hd*0.74), cw = Math.max(1, Math.round(Wd*0.45)), ch = Math.max(1, Math.round(Hd*0.16));
+      const d = c.getContext('2d').getImageData(x, y, cw, ch).data;
+      const lin = v => { v /= 255; return v <= 0.04045 ? v/12.92 : Math.pow((v + 0.055)/1.055, 2.4); };
+      let L = 0; for(let i = 0; i < d.length; i += 4) L += 0.2126*lin(d[i]) + 0.7152*lin(d[i + 1]) + 0.0722*lin(d[i + 2]);
+      L /= d.length/4;
+      const white = 1.05/(L + 0.05), dark = (L + 0.05)/0.055, mark = r => r >= 4.5 ? 'good' : r >= 3 ? 'large text only' : 'too low';
+      cres.innerHTML = `White text: <b>${white.toFixed(1)}:1</b> (${mark(white)})<br>Dark text: <b>${dark.toFixed(1)}:1</b> (${mark(dark)})`;
+    }), cres));
+}
+
+/* Library tab */
+{
+  const LKEY = 'ficageb.liquid.library';
+  let lib = store.get(LKEY, []);
+  let currentId = null, delArm = 0;
+  const nameI = h('input', {class:'txt', placeholder:'Look name'});
+  const list = h('div', {class:'lib'});
+  const fileI = h('input', {type:'file', accept:'.json,application/json', style:'display:none'});
+  const thumb = () => smallRender(240).toDataURL('image/jpeg', 0.82);
+  const persist = () => store.set(LKEY, lib);
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const draw = () => {
+    list.replaceChildren(...(lib.length ? lib.map(it => h('button', {class:'lib-item' + (it.id === currentId ? ' active' : ''), type:'button', onclick:() => {
+      look = normalizeLook(clone(it.look)); currentId = it.id; nameI.value = it.name; syncAll(); changed(); draw();
+    }}, h('img', {src:it.thumb, alt:''}), h('span', {text:it.name}), h('small', {text:new Date(it.updated).toLocaleDateString()}))) : [h('p', {class:'empty', text:'No saved looks yet. Name the current look and press Save as.'})]));
+  };
+  const saveAs = () => {
+    const it = {id:newId(), name:nameI.value.trim() || `Look ${lib.length + 1}`, look:clone(look), thumb:thumb(), updated:Date.now()};
+    lib.unshift(it); currentId = it.id; nameI.value = it.name; persist(); draw(); toast(`Saved "${it.name}"`);
+  };
+  const cur = () => lib.find(x => x.id === currentId);
+  const delB = btn('Delete', () => {
+    const it = cur(); if(!it){ toast('Select a look first'); return; }
+    if(Date.now() - delArm > 3000){ delArm = Date.now(); delB.textContent = 'Click again'; setTimeout(() => delB.textContent = 'Delete', 3000); return; }
+    lib = lib.filter(x => x !== it); currentId = null; delArm = 0; delB.textContent = 'Delete'; persist(); draw(); toast(`Deleted "${it.name}"`);
+  }, 'danger');
+  fileI.addEventListener('change', async () => {
+    const f = fileI.files[0]; if(!f) return;
+    try{
+      const data = JSON.parse(await f.text());
+      if(data.generator && data.generator !== GEN) throw new Error(`this file is for the ${data.generator} generator`);
+      const looks = Array.isArray(data) ? data : data.looks;
+      if(!Array.isArray(looks)) throw new Error('no looks found in this file');
+      let n = 0;
+      for(const it of looks){ if(!it || !it.look || (it.look.generator && it.look.generator !== GEN)) continue; lib.push({id:newId(), name:it.name || 'Imported look', look:normalizeLook(it.look), thumb:it.thumb || '', updated:it.updated || Date.now()}); n++; }
+      persist(); draw(); toast(`Imported ${n} look${n === 1 ? '' : 's'}`);
+    }catch(e){ toast('Import failed: ' + e.message); }
+    fileI.value = '';
+  });
+  draw();
+  panes.Library.append(
+    section('Current look', true, nameI, h('div', {class:'btns'},
+      btn('Save', () => { const it = cur(); if(!it){ saveAs(); return; } it.look = clone(look); it.thumb = thumb(); it.updated = Date.now(); persist(); draw(); toast(`Saved "${it.name}"`); }, 'primary'),
+      btn('Save as', saveAs),
+      btn('Duplicate', () => { const it = cur(); if(!it){ toast('Select a look first'); return; } const c = clone(it); c.id = newId(); c.name = it.name + ' copy'; c.updated = Date.now(); lib.unshift(c); currentId = c.id; nameI.value = c.name; persist(); draw(); }),
+      btn('Rename', () => { const it = cur(); if(!it){ toast('Select a look first'); return; } const n = nameI.value.trim(); if(!n){ toast('Type the new name first'); return; } it.name = n; persist(); draw(); }),
+      delB),
+      h('p', {class:'hint', text:'Save updates the selected look. Save as creates a new one.'})),
+    section('Library', true, list),
+    section('Backup and sharing', false, h('div', {class:'btns'},
+      btn('Export library', () => download(new Blob([JSON.stringify({app:'FICAGEB', generator:GEN, version:VERSION, looks:lib}, null, 1)], {type:'application/json'}), 'FICAGEB_Liquid_library.json')),
+      btn('Export current look', () => download(new Blob([JSON.stringify({app:'FICAGEB', generator:GEN, version:VERSION, looks:[{name:nameI.value.trim() || 'Look', look}]}, null, 1)], {type:'application/json'}), (nameI.value.trim() || 'FICAGEB_Liquid_look').replace(/[^\w-]+/g, '_') + '.json')),
+      btn('Import', () => fileI.click())), fileI));
+}
+
+/* Render tab */
+let outDir = null, job = null;
+function frameName(pattern, i, suffix = ''){
+  let p = (pattern || 'FICAGEB_Liquid_####').replace(/\.png$/i, '');
+  if(!/#/.test(p)) p += '_####';
+  return p.replace(/#+/, m => String(i).padStart(m.length, '0')) + suffix + '.png';
+}
+function toBlob(c){ return c.convertToBlob ? c.convertToBlob({type:'image/png'}) : new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('PNG encoding failed')), 'image/png')); }
+function plan(kind){
+  const total = totalFrames();
+  let Wd = R.w, Hd = R.h; if(R.draft){ Wd = Math.max(2, Math.round(Wd/2)); Hd = Math.max(2, Math.round(Hd/2)); }
+  let frames = [];
+  if(kind === 'test'){ const m = Math.floor(total/2); frames = [...new Set([0, 1, m, total - 2, total - 1])].filter(f => f >= 0 && f < total); }
+  else { const s = R.full ? 0 : clamp(R.start | 0, 0, total - 1), e = R.full ? total - 1 : clamp(R.end | 0, s, total - 1); for(let f = s; f <= e; f += R.draft ? 2 : 1) frames.push(f); }
+  return {W:Wd, H:Hd, frames, total};
+}
+{
+  const P = panes.Render;
+  const fmtSel = h('select', {'aria-label':'Format preset'});
+  let customFormats = store.get('ficageb.formats', []);
+  const fillFormats = () => {
+    fmtSel.replaceChildren(h('option', {value:'', text:'Custom size'}), ...FORMATS.map(([n, w, hgt]) => h('option', {value:`${w}x${hgt}`, text:n})), ...customFormats.map(f => h('option', {value:`${f.w}x${f.h}`, text:`${f.name} ${f.w}×${f.h}`})));
+    fmtSel.value = [...fmtSel.options].some(o => o.value === `${R.w}x${R.h}`) ? `${R.w}x${R.h}` : '';
+  };
+  fmtSel.addEventListener('change', () => { if(!fmtSel.value) return; const [w, hgt] = fmtSel.value.split('x').map(Number); R.w = w; R.h = hgt; afterR(); });
+  const field = (label, el) => h('label', {class:'field'}, h('span', {text:label}), el);
+  const wF = numField({get:() => R.w, set:v => { R.w = v; afterR(); }, min:16, max:30000, step:1, int:true, dragUnit:4});
+  const hF = numField({get:() => R.h, set:v => { R.h = v; afterR(); }, min:16, max:30000, step:1, int:true, dragUnit:4});
+  const venueName = h('input', {class:'txt', placeholder:'Venue name, e.g. Palais des Congrès main hall'});
+  const sizeInfo = h('p', {class:'info'}), rangeInfo = h('p', {class:'info'}), estOut = h('p', {class:'info'});
+  const sF = numField({get:() => R.start, set:v => { R.start = v; afterR(); }, min:0, max:99999, step:1, int:true, dragUnit:0.5});
+  const eF = numField({get:() => R.end, set:v => { R.end = v; afterR(); }, min:0, max:99999, step:1, int:true, dragUnit:0.5});
+  const parF = numField({get:() => R.parallel, set:v => { R.parallel = v; afterR(); }, min:1, max:12, step:1, int:true, dragUnit:0.1});
+  const patI = h('input', {class:'txt', spellcheck:'false'});
+  patI.addEventListener('change', () => { R.pattern = patI.value.trim() || 'FICAGEB_Liquid_####'; afterR(); });
+  const dirLabel = h('span', {class:'info'});
+  const prog = h('div', {class:'progress'}, h('div'));
+  const statusEl = h('p', {class:'status'});
+  const rpName = h('input', {class:'txt', placeholder:'Render preset name'});
+  const rpSel = h('select', {'aria-label':'Render presets'});
+  let rpresets = store.get('ficageb.renderPresets', []);
+  const fillRP = () => rpSel.replaceChildren(h('option', {value:'', text:rpresets.length ? 'Load a render preset' : 'No render presets yet'}), ...rpresets.map((p, i) => h('option', {value:i, text:p.name})));
+  rpSel.addEventListener('change', () => { const p = rpresets[+rpSel.value]; if(!p) return; R = Object.assign(DEFAULT_R(), clone(p.r)); R.pattern = String(R.pattern || '').replace(/Voronoi|GeneCode|FluidGrid/gi, 'Liquid'); afterR(); toast(`Render preset "${p.name}" loaded`); });
+  fillRP();
+  const status = (msg, cls = '') => { statusEl.textContent = msg; statusEl.className = 'status ' + cls; };
+  const setProg = v => prog.firstChild.style.width = (v*100).toFixed(1) + '%';
+  function afterR(){ syncAll(); layoutStage(); scheduleSave(); }
+  reg(() => {
+    wF.sync(); hF.sync(); sF.sync(); eF.sync(); parF.sync(); fillFormats();
+    if(document.activeElement !== patI) patI.value = R.pattern;
+    const {W:Wd, H:Hd, frames, total} = plan('full');
+    sizeInfo.innerHTML = `Output <b>${Wd}×${Hd}</b>${R.draft ? ' (draft, half size)' : ''}, ${(Wd*Hd/1e6).toFixed(1)} MP. Rendered on the GPU in tiles of ${RG.tile} px at this exact size.`;
+    rangeInfo.innerHTML = `Loop is <b>${total} frames</b> (${look.motion.dur} s at ${look.motion.fps} fps). This render: <b>${frames.length} frames</b>. First file: ${frameName(R.pattern, R.draft ? 0 : frames[0] || 0)}`;
+    dirLabel.textContent = outDir ? `Folder: ${outDir.name}` : 'No folder chosen';
+  });
+  async function getDir(){
+    if(outDir) return outDir;
+    if(!('showDirectoryPicker' in window)) return null;
+    try{ outDir = await window.showDirectoryPicker({mode:'readwrite', id:'ficageb'}); syncAll(); return outDir; }
+    catch(e){ if(e.name === 'AbortError') return undefined; status('Folder access is blocked in this window. Open the HTML file directly in Chrome or Edge to write frames to a folder.', 'warn'); return null; }
+  }
+  async function fileExists(dir, name){ try{ const f = await (await dir.getFileHandle(name)).getFile(); return f.size > 0; }catch(e){ return false; } }
+  async function writeFile(dir, name, blob){ const fh = await dir.getFileHandle(name, {create:true}); const w = await fh.createWritable(); await w.write(blob); await w.close(); }
+  const renderFrame = (Wd, Hd, f) => renderRegion(look, f, Wd, Hd, 0, 0, Wd, Hd, 'result', Wd);
+  const renderB = btn('Render', () => startRender('full'), 'primary');
+  const testB = btn('Test render', () => startRender('test'));
+  const stopB = btn('Stop', () => { if(job){ job.cancel = true; status('Stopping after the frames in progress…', 'warn'); } }, 'danger');
+  stopB.disabled = true;
+  async function startRender(kind){
+    if(job) return;
+    const {W:Wd, H:Hd, frames} = plan(kind);
+    if(Wd > 32767 || Hd > 32767 || Wd*Hd > 268e6){ status('This frame is larger than a browser image can hold (about 268 million pixels).', 'err'); return; }
+    const dir = await getDir();
+    if(dir === undefined) return;
+    if(!dir && frames.length > 30){ status('Without folder access, only test renders and up to 30 frames can download. Open this file directly in Chrome or Edge.', 'err'); return; }
+    job = {cancel:false}; rendering = true; renderB.disabled = testB.disabled = true; stopB.disabled = false;
+    const par = R.parallel, t0 = performance.now();
+    let done = 0, skipped = 0;
+    const inflight = new Set();
+    const progress = () => {
+      setProg(done/frames.length);
+      const real = done - skipped, el = performance.now() - t0, eta = real > 0 ? el/real*(frames.length - done) : 0;
+      status(`${done} / ${frames.length} frames${skipped ? `, ${skipped} skipped` : ''}. Elapsed ${fmtTime(el)}${real ? `, about ${fmtTime(eta)} left` : ''}`);
+    };
+    status('Starting…');
+    try{
+      for(let i = 0; i < frames.length; i++){
+        if(job.cancel) break;
+        const f = frames[i];
+        const num = kind === 'test' ? f : R.draft ? i : f;
+        const name = frameName(R.pattern, num, kind === 'test' ? '_test' : '');
+        if(dir && R.skip && kind !== 'test' && await fileExists(dir, name)){ skipped++; done++; progress(); continue; }
+        while(inflight.size >= par) await Promise.race(inflight);
+        const c = renderFrame(Wd, Hd, f);
+        const p = toBlob(c).then(b => dir ? writeFile(dir, name, b) : download(b, name)).then(() => { done++; progress(); });
+        const tracked = p.finally(() => inflight.delete(tracked));
+        inflight.add(tracked);
+        await sleep(0);
+      }
+      await Promise.all(inflight);
+      const el = fmtTime(performance.now() - t0);
+      status(job.cancel ? `Stopped at ${done} of ${frames.length} frames. Render again with "Skip existing" on to continue.` : `Done: ${frames.length} frames in ${el}${dir ? ` to ${dir.name}` : ''}.`, job.cancel ? 'warn' : 'ok');
+    }catch(err){ status('Render stopped: ' + err.message, 'err'); }
+    finally{ job = null; rendering = false; dirty = true; renderB.disabled = testB.disabled = false; stopB.disabled = true; }
+  }
+  async function estimate(){
+    if(job) return;
+    const {W:Wd, H:Hd, frames} = plan('full');
+    estOut.textContent = 'Measuring one frame…'; await sleep(30);
+    let t = performance.now(); const c = renderFrame(Wd, Hd, frame); const rMs = performance.now() - t;
+    t = performance.now(); const b = await toBlob(c); const eMs = performance.now() - t;
+    const per = Math.max(rMs, eMs/R.parallel) + rMs*0.1;
+    estOut.innerHTML = `About <b>${fmtTime(per*frames.length)}</b> and <b>${fmtBytes(b.size*frames.length)}</b> for ${frames.length} frames (one frame: ${Math.round(rMs)} ms drawing, ${Math.round(eMs)} ms PNG, ${fmtBytes(b.size)}).`;
+    dirty = true;
+  }
+  P.append(
+    section('Output size', true, fmtSel, h('div', {class:'grid2'}, field('Width px', wF), field('Height px', hF)), sizeInfo,
+      h('div', {class:'btns', style:'flex-wrap:nowrap'}, venueName, btn('Save format', () => {
+        const n = venueName.value.trim(); if(!n){ toast('Type a venue name first'); return; }
+        customFormats.push({name:n, w:R.w, h:R.h}); store.set('ficageb.formats', customFormats); venueName.value = ''; fillFormats(); toast('Venue format saved');
+      }))),
+    section('Frames', true, rangeInfo,
+      toggle('Full loop', () => R.full, v => { R.full = v; scheduleSave(); }),
+      h('div', {class:'grid2'}, field('Start frame', sF), field('End frame', eF)),
+      toggle('Draft (half size, every 2nd frame)', () => R.draft, v => { R.draft = v; layoutStage(); scheduleSave(); })),
+    section('Speed', false, field('Frames encoded in parallel', parF), btn('Estimate time and space', estimate), estOut),
+    section('Files', true, field('File name (#### becomes the frame number)', patI),
+      h('div', {class:'btns'}, btn('Choose folder', async () => { outDir = null; await getDir(); syncAll(); }), dirLabel),
+      toggle('Skip existing frames (resume)', () => R.skip, v => { R.skip = v; scheduleSave(); }),
+      h('p', {class:'hint', text:'PNG sequence, 8-bit, with alpha when Transparent background is on. Import into After Effects as an image sequence.'})),
+    section('Render', true, h('div', {class:'btns'}, renderB, testB, stopB), prog, statusEl,
+      btn('Save current frame as PNG', async () => { if(job) return; const c = renderFrame(R.w, R.h, frame); download(await toBlob(c), frameName(R.pattern, frame, '_still')); dirty = true; })),
+    section('Render presets', false,
+      h('div', {class:'btns', style:'flex-wrap:nowrap'}, rpName, btn('Save', () => {
+        const n = rpName.value.trim() || `${R.w}×${R.h}${R.draft ? ' draft' : ''}`;
+        rpresets.push({name:n, r:clone(R)}); store.set('ficageb.renderPresets', rpresets); rpName.value = ''; fillRP(); toast(`Render preset "${n}" saved`);
+      })),
+      h('div', {class:'btns', style:'flex-wrap:nowrap'}, rpSel, btn('Delete', () => { const i = +rpSel.value; if(rpSel.value === '' || !rpresets[i]) return; rpresets.splice(i, 1); store.set('ficageb.renderPresets', rpresets); fillRP(); }))));
+}
+
+layoutStage();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
