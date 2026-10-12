@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FICAGEB Liquid · Fehmican</title>
+<style>
+:root{
+  --font:"Helvetica Neue",Helvetica,Arial,system-ui,sans-serif; /* swap for your Cargo site font */
+  --ink:#f2f4f7; --ink-soft:rgba(242,244,247,.62); --shade:rgba(0,0,0,.35);
+}
+html,body{margin:0;height:100%;background:#03060b;overflow:hidden}
+body{font:13px/1.35 var(--font);color:var(--ink);-webkit-font-smoothing:antialiased}
+body[data-tone="light"]{--ink:#1d1d1f;--ink-soft:rgba(29,29,31,.6);--shade:rgba(255,255,255,.4);background:#eef1f6}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;transition:opacity .35s ease}
+canvas.fade{opacity:0}
+.bar{position:fixed;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding:16px 18px calc(16px + env(safe-area-inset-bottom,0px));pointer-events:none;
+  text-shadow:0 0 12px var(--shade);opacity:1;transition:opacity .4s ease}
+body.idle .bar{opacity:0}
+.title{display:grid;gap:2px}
+.title b{font-weight:500;font-size:14px;letter-spacing:.01em}
+.title span{color:var(--ink-soft)}
+.ctl{display:flex;gap:6px;pointer-events:auto}
+.ctl button,.ctl a{font:inherit;color:var(--ink);background:transparent;border:1px solid var(--ink-soft);border-radius:999px;
+  padding:5px 12px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.ctl button:hover,.ctl a:hover{border-color:var(--ink)}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+body.noui .bar{display:none}
+.fallback{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--ink-soft)}
+@media (max-width:520px){ .title span{display:none} .ctl a{display:none} }
+@media (prefers-reduced-motion:reduce){ canvas,.bar{transition:none} }
+</style>
+</head>
+<body>
+<canvas id="cv" aria-label="Animated liquid light study"></canvas>
+<div class="bar">
+  <div class="title"><b>FICAGEB Liquid</b><span id="lookName"></span></div>
+  <div class="ctl">
+    <button id="next" type="button">Next look</button>
+    <button id="play" type="button">Pause</button>
+    <a id="tool" target="_blank" rel="noopener">Open the tool</a>
+  </div>
+</div>
+<script>
+'use strict';
+const GEN = 'liquid', VERSION = '0.5';
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+function h(tag, attrs = {}, ...kids){
+  const e = document.createElement(tag);
+  for(const [k, v] of Object.entries(attrs)){
+    if(v === undefined || v === null) continue;
+    if(k === 'class') e.className = v;
+    else if(k === 'text') e.textContent = v;
+    else if(k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for(const c of kids.flat()) if(c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+}
+const clone = o => JSON.parse(JSON.stringify(o));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const TAU = Math.PI*2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const mix = (a, b, t) => a + (b - a)*t;
+const smooth = (e0, e1, x) => { const t = clamp((x - e0)/((e1 - e0) || 1e-9), 0, 1); return t*t*(3 - 2*t); };
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ toast('Could not save: browser storage is full or blocked'); return false; } }
+};
+let toastT;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+function btn(label, fn, cls = ''){ return h('button', {class:'btn ' + cls, onclick:fn, type:'button'}, label); }
+function fmtTime(ms){ const s = Math.round(ms/1000); const hh = Math.floor(s/3600), mm = Math.floor(s%3600/60), ss = s%60; return hh ? `${hh} h ${mm} min` : mm ? `${mm} min ${ss} s` : `${ss} s`; }
+function fmtBytes(b){ if(b > 1e9) return (b/1e9).toFixed(1) + ' GB'; if(b > 1e6) return (b/1e6).toFixed(1) + ' MB'; return Math.round(b/1e3) + ' KB'; }
+const lockSvg = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('width', '11'); s.setAttribute('height', '12'); s.setAttribute('viewBox', '0 0 11 12'); s.innerHTML = '<rect x="1" y="5" width="9" height="7" rx="1" fill="currentColor"/><path d="M3 5V3.5a2.5 2.5 0 0 1 5 0V5" fill="none" stroke="currentColor" stroke-width="1.4"/>'; return s; };
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0)/4294967296; }; }
+function ihash(n){ n = Math.imul(n ^ (n >>> 16), 0x7feb352d); n = Math.imul(n ^ (n >>> 15), 0x846ca68b); n ^= n >>> 16; return (n >>> 0)/4294967296; }
+const hh2 = (a, b = 0) => ihash(Math.imul(a + 1, 0x9E3779B1) ^ Math.imul(b + 7, 0x85EBCA77));
+const hash3 = (a, b, c) => ihash(Math.imul(a + 11, 0x9E3779B1) ^ Math.imul(b + 13, 0x85EBCA77) ^ Math.imul(c + 17, 0xC2B2AE3D));
+function download(blob, name){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+
+/* ================= simplex noise ================= */
+const PERM = new Uint8Array(512);
+{ const r = mulberry32(1337), p = [...Array(256).keys()]; for(let i = 255; i > 0; i--){ const j = Math.floor(r()*(i + 1)); [p[i], p[j]] = [p[j], p[i]]; } for(let i = 0; i < 512; i++) PERM[i] = p[i & 255]; }
+const GR3 = [1,1,0,-1,1,0,1,-1,0,-1,-1,0,1,0,1,-1,0,1,1,0,-1,-1,0,-1,0,1,1,0,-1,1,0,1,-1,0,-1,-1];
+function snoise3(x, y, z){
+  const F3 = 1/3, G3 = 1/6;
+  const s = (x + y + z)*F3, i = Math.floor(x + s), j = Math.floor(y + s), k = Math.floor(z + s);
+  const t = (i + j + k)*G3, x0 = x - (i - t), y0 = y - (j - t), z0 = z - (k - t);
+  let i1, j1, k1, i2, j2, k2;
+  if(x0 >= y0){ if(y0 >= z0){ i1=1;j1=0;k1=0;i2=1;j2=1;k2=0; } else if(x0 >= z0){ i1=1;j1=0;k1=0;i2=1;j2=0;k2=1; } else { i1=0;j1=0;k1=1;i2=1;j2=0;k2=1; } }
+  else { if(y0 < z0){ i1=0;j1=0;k1=1;i2=0;j2=1;k2=1; } else if(x0 < z0){ i1=0;j1=1;k1=0;i2=0;j2=1;k2=1; } else { i1=0;j1=1;k1=0;i2=1;j2=1;k2=0; } }
+  const x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3;
+  const x2 = x0 - i2 + 2*G3, y2 = y0 - j2 + 2*G3, z2 = z0 - k2 + 2*G3;
+  const x3 = x0 - 1 + 3*G3, y3 = y0 - 1 + 3*G3, z3 = z0 - 1 + 3*G3;
+  const ii = i & 255, jj = j & 255, kk = k & 255;
+  let n = 0, g, tt;
+  tt = 0.6 - x0*x0 - y0*y0 - z0*z0; if(tt > 0){ g = (PERM[ii + PERM[jj + PERM[kk]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x0 + GR3[g+1]*y0 + GR3[g+2]*z0); }
+  tt = 0.6 - x1*x1 - y1*y1 - z1*z1; if(tt > 0){ g = (PERM[ii + i1 + PERM[jj + j1 + PERM[kk + k1]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x1 + GR3[g+1]*y1 + GR3[g+2]*z1); }
+  tt = 0.6 - x2*x2 - y2*y2 - z2*z2; if(tt > 0){ g = (PERM[ii + i2 + PERM[jj + j2 + PERM[kk + k2]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x2 + GR3[g+1]*y2 + GR3[g+2]*z2); }
+  tt = 0.6 - x3*x3 - y3*y3 - z3*z3; if(tt > 0){ g = (PERM[ii + 1 + PERM[jj + 1 + PERM[kk + 1]]] % 12)*3; tt *= tt; n += tt*tt*(GR3[g]*x3 + GR3[g+1]*y3 + GR3[g+2]*z3); }
+  return 32*n;
+}
+/* ================= parameters ================= */
+const DEFS = [
+  // shape
+  {k:'scale', t:'num', l:'Overall size', min:0.2, max:3, step:0.01, d:1, s:'shape'},
+  {k:'body', t:'num', l:'Body size', min:0, max:2.5, step:0.01, d:1, s:'shape', rnd:[0.65, 1.35]},
+  {k:'logMix', t:'num', l:'Core falloff', min:0, max:1, step:0.01, d:1, s:'shape', rnd:[0.5, 1]},
+  {k:'pulseMode', t:'select', l:'Pulse style', o:[['breathe','Breathe (stays on its center)'],['swing','Swing (original, sways off center)']], d:'breathe', s:'shape'},
+  {k:'wobble', t:'num', l:'Pulse amount', min:0, max:2, step:0.01, d:1, s:'shape', rnd:[0.3, 1.5]},
+  {k:'stretchX', t:'num', l:'Stretch width', min:0.3, max:4, step:0.01, d:1, s:'shape', rnd:[0.8, 1.6]},
+  {k:'stretchY', t:'num', l:'Stretch height', min:0.3, max:4, step:0.01, d:1, s:'shape', rnd:[0.8, 1.3]},
+  {k:'merge', t:'num', l:'Liquid merge', min:0, max:3, step:0.01, d:0.6, s:'shape', rnd:[0.2, 1.5]},
+  {k:'colSharp', t:'num', l:'Color separation', min:0.2, max:12, step:0.1, d:3, s:'shape', rnd:[1, 6]},
+  // turbulence
+  {k:'turb', t:'num', l:'Turbulence', min:0, max:2, step:0.01, d:0.5, s:'turb', rnd:[0.25, 0.8]},
+  {k:'freq', t:'num', l:'Turbulence scale', min:0.2, max:8, step:0.01, d:2, s:'turb', rnd:[1.2, 2.8]},
+  {k:'detail', t:'num', l:'Fine detail', min:0, max:1.5, step:0.01, d:0, s:'turb', rnd:[0, 0.35]},
+  {k:'detScale', t:'num', l:'Fine detail scale', min:1, max:6, step:0.01, d:2.3, s:'turb', rnd:[1.5, 4]},
+  // motion
+  {k:'timeScale', t:'num', l:'Overall speed', min:0, max:4, step:0.01, d:1, s:'motion'},
+  {k:'spinX', t:'num', l:'Tumble speed', min:-2, max:2, step:0.01, d:0.4, s:'motion', rnd:[-0.6, 0.6]},
+  {k:'spinY', t:'num', l:'Roll speed', min:-2, max:2, step:0.01, d:0.3, s:'motion', rnd:[-0.5, 0.5]},
+  {k:'pulse', t:'num', l:'Pulse speed', min:0, max:3, step:0.01, d:0.7, s:'motion', rnd:[0.2, 1.2]},
+  {k:'flow', t:'num', l:'Flow speed', min:0, max:3, step:0.01, d:1, s:'motion', rnd:[0.3, 1.5]},
+  {k:'hoverBase', t:'num', l:'Hover, every center', min:0, max:0.8, step:0.005, d:0, s:'motion', rnd:[0, 0.15]},
+  {k:'wigAll', t:'num', l:'Hover amount ×, all', min:0, max:3, step:0.01, d:1, s:'motion'},
+  {k:'wigSpeedAll', t:'num', l:'Hover speed, all', min:0, max:4, step:0.01, d:1, s:'motion'},
+  {k:'rotBase', t:'num', l:'Rotation, every center', min:-2, max:2, step:0.01, d:0, s:'motion'},
+  {k:'rotAll', t:'num', l:'Rotation speed ×, all', min:0, max:4, step:0.01, d:1, s:'motion'},
+  {k:'rotVar', t:'num', l:'Rotation variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.6]},
+  {k:'rotMix', t:'toggle', l:'Mixed directions (some CW, some CCW)', d:false, s:'motion'},
+  {k:'speedVar', t:'num', l:'Speed variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.5]},
+  {k:'hoverVar', t:'num', l:'Hover speed variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.7]},
+  {k:'hoverAmtVar', t:'num', l:'Hover amount variation', min:0, max:1, step:0.01, d:0, s:'motion', rnd:[0, 0.6]},
+  {k:'varSeed', t:'num', l:'Variation seed', min:0, max:9999, step:1, int:true, d:1, s:'motion', drag:0.5},
+  // ray marching
+  {k:'zoom', t:'num', l:'Field of view', min:0.3, max:3, step:0.01, d:1, s:'camera'},
+  {k:'persp', t:'num', l:'Perspective', min:0, max:1, step:0.01, d:1, s:'camera'},
+  {k:'wideFix', t:'toggle', l:'Wide frame correction', d:true, s:'camera'},
+  {k:'steps', t:'num', l:'March steps', min:2, max:32, step:1, int:true, d:6, s:'camera', drag:0.1},
+  {k:'start', t:'num', l:'Start depth', min:0, max:5, step:0.01, d:2.5, s:'camera'},
+  {k:'maxStep', t:'num', l:'Step limit', min:0.1, max:3, step:0.01, d:1, s:'camera'},
+  {k:'reach', t:'num', l:'Glow reach', min:0.3, max:6, step:0.01, d:2.5, s:'camera', rnd:[1.6, 3.4]},
+  {k:'density', t:'num', l:'Glow density', min:0, max:2, step:0.01, d:0.7, s:'camera', rnd:[0.45, 1]},
+  {k:'shade', t:'num', l:'Shading depth', min:0.01, max:0.6, step:0.005, d:0.17, s:'camera', rnd:[0.08, 0.3]},
+  {k:'lightAz', t:'num', l:'Light direction', min:-180, max:180, step:1, d:45, s:'camera'},
+  {k:'lightEl', t:'num', l:'Light height', min:-89, max:89, step:1, d:35, s:'camera'},
+  // glow and grade
+  {k:'gain', t:'num', l:'Glow strength', min:0, max:12, step:0.05, d:5, s:'grade'},
+  {k:'shadowAmt', t:'num', l:'Shadow tone amount', min:0, max:1.5, step:0.01, d:0.4, s:'grade'},
+  {k:'exposure', t:'num', l:'Exposure', min:0, max:4, step:0.01, d:1, s:'grade'},
+  {k:'sat', t:'num', l:'Saturation', min:0, max:2, step:0.01, d:1, s:'grade'},
+  {k:'contrast', t:'num', l:'Contrast', min:0.3, max:2, step:0.01, d:1, s:'grade'},
+  {k:'hue', t:'num', l:'Hue shift', min:-180, max:180, step:1, d:0, s:'grade'},
+  {k:'tone', t:'toggle', l:'Soft highlights (tone map)', d:false, s:'grade'},
+  {k:'blend', t:'select', l:'Blend on background', o:[['add','Add (glow)'],['screen','Screen'],['over','Over (light backgrounds)']], d:'add', s:'grade'},
+  {k:'overK', t:'num', l:'Over strength', min:0.2, max:4, step:0.01, d:1.5, s:'grade'},
+  {k:'transparent', t:'toggle', l:'Transparent background (PNG alpha)', d:false, s:'grade'},
+  // background
+  {k:'bgMode', t:'select', l:'Type', o:[['solid','Solid'],['linear','Linear, 2 colors'],['linear3','Linear, 3 colors'],['radial','Radial'],['corners','Four corners']], d:'solid', s:'bg'},
+  {k:'bgAngle', t:'num', l:'Angle', min:-180, max:180, step:1, d:90, s:'bg'},
+  {k:'bgScale', t:'num', l:'Radial size', min:0.2, max:3, step:0.01, d:1, s:'bg'},
+  {k:'bgEase', t:'toggle', l:'Smooth gradient', d:true, s:'bg'},
+  // finishing
+  {k:'dimOn', t:'toggle', l:'Center dimming', d:true, s:'finish'},
+  {k:'dimAmt', t:'num', l:'Dimming amount', min:0, max:1, step:0.01, d:0.7, s:'finish'},
+  {k:'dimIn', t:'num', l:'Dimming inner radius', min:0, max:1.5, step:0.01, d:0.3, s:'finish'},
+  {k:'dimOut', t:'num', l:'Dimming outer radius', min:0.01, max:2, step:0.01, d:0.5, s:'finish'},
+  {k:'vig', t:'num', l:'Vignette', min:0, max:1, step:0.01, d:0, s:'finish'},
+  {k:'grain', t:'num', l:'Grain', min:0, max:0.3, step:0.005, d:0, s:'finish'},
+  {k:'grainSize', t:'num', l:'Grain size px', min:1, max:8, step:0.5, d:1, s:'finish'},
+];
+const DEF = Object.fromEntries(DEFS.map(d => [d.k, d]));
+const ELEMENTS = ['Background 1', 'Background 2', 'Background 3', 'Background 4', 'Shadow tone'];
+const DEFAULT_PALETTE = ['#03060b','#0b1a2b','#ff8099','#40bfff','#cc66ff','#66ff33','#f2f4f7'];
+const DEFAULT_IDX = [0,1,1,0,3];
+const MAXC = 8;
+const CDEF = {on:true, x:0, y:0, size:1, col:2, bright:1, speed:1, phase:0, driftR:0, driftS:0.3, wigA:0, wigS:0.8, wigSize:0, rot:0, angle:0};
+const mkC = o => { const c = Object.assign({}, CDEF, o || {}); for(const k of Object.keys(CDEF)) if(typeof c[k] !== typeof CDEF[k]) c[k] = CDEF[k]; c.col = clamp(Math.round(c.col), 0, 6); return c; };
+const DEFAULT_LOOK = () => ({
+  generator:GEN, seed:7,
+  params:Object.fromEntries(DEFS.map(d => [d.k, d.d])),
+  palette:[...DEFAULT_PALETTE],
+  idx:[...DEFAULT_IDX],
+  centers:[mkC()],
+  motion:{dur:10, fps:25, loop:true}
+});
+/* Starting points. p: parameters, c: centers, pal: palette, idx: element -> palette index (0-based) */
+const STARTERS = {
+  'Nebula': {p:{pulseMode:'swing'}, c:[{}]},
+  'Twin cells': {p:{merge:1, body:0.9, turb:0.55}, c:[{x:-0.38, y:0.05, size:0.8, col:2}, {x:0.4, y:-0.05, size:0.8, col:3, phase:140}]},
+  'Trio': {p:{merge:0.7, body:0.85, colSharp:4}, c:[{x:-0.45, y:-0.25, size:0.7, col:2}, {x:0.45, y:-0.25, size:0.7, col:3, phase:90}, {x:0, y:0.4, size:0.7, col:4, phase:200}]},
+  'Calm drift': {p:{merge:1.2, spinX:0.15, spinY:0.1, pulse:0.3, flow:0.4, dimOn:false}, c:[{x:-0.5, y:0.2, size:0.75, col:2, driftR:0.12, driftS:0.3, wigA:0.04, wigSize:0.08}, {x:0.3, y:-0.3, size:0.85, col:3, driftR:0.15, driftS:-0.25, phase:120}, {x:0.6, y:0.45, size:0.55, col:4, driftR:0.08, driftS:0.4, phase:240}]},
+  'Wide band': {p:{merge:1.4, body:0.8, stretchX:1.3, dimOn:false}, c:[-0.8, -0.4, 0, 0.4, 0.8].map((x, i) => ({x, y:0, size:0.6, col:[2,3,4,3,2][i], phase:i*72}))},
+  'Constellation': {p:{merge:0.15, turb:0.7, body:0.9, colSharp:6, dimOn:false}, c:[[-0.7,0.4,0.45],[-0.25,-0.35,0.5],[0.1,0.3,0.4],[0.55,-0.1,0.55],[0.8,0.5,0.35],[-0.6,-0.6,0.35],[0.35,-0.65,0.4]].map(([x, y, size], i) => ({x, y, size, col:2 + i % 3, phase:i*51}))},
+  'Hover field': {p:{merge:0.9, spinX:0.2, spinY:0.15, pulse:0.4, flow:0.5, dimOn:false, speedVar:0.35, hoverVar:0.6, hoverAmtVar:0.3}, c:[[-0.6,0.25,0.6,2],[-0.1,-0.3,0.7,3],[0.45,0.2,0.55,4],[0.75,-0.35,0.45,2]].map(([x, y, size, col], i) => ({x, y, size, col, phase:i*83, wigA:0.07, wigS:0.6 + i*0.15, wigSize:0.12}))},
+  'Violet core': {p:{shadowAmt:0.5, pulseMode:'swing'}, c:[{col:4}], pal:['#02040a','#0a1030','#ff8099','#1a66ff','#cc66ff','#66ff33','#f2f4f7']},
+  'Green signal': {p:{shadowAmt:0.5, pulseMode:'swing'}, c:[{col:5}], pal:['#020805','#0a2014','#ff8099','#1a9933','#cc66ff','#66ff33','#f2f4f7']},
+  'Soft light': {p:{blend:'over', overK:1.6, shadowAmt:0.25, bgMode:'linear', bgAngle:90, dimOn:false, gain:4, merge:0.8}, c:[{x:-0.3, y:0.1, size:0.85, col:2}, {x:0.35, y:-0.1, size:0.75, col:4, phase:160}], pal:['#eef1f6','#f9f6f2','#ff6f8f','#7fb6ff','#9b7bff','#5ccf8a','#1d1d1f']},
+};
+const FORMATS = [
+  ['HD 1920×1080', 1920, 1080], ['4K UHD 3840×2160', 3840, 2160], ['Wide LED 3840×1080', 3840, 1080],
+  ['Wide LED 7680×1080', 7680, 1080], ['12K LED 12000×2160', 12000, 2160], ['Square 1080×1080', 1080, 1080], ['Portrait 1080×1920', 1080, 1920]
+];
+const DEFAULT_R = () => ({w:1920, h:1080, full:true, start:0, end:249, draft:false,
+  parallel:Math.max(1, Math.min(6, Math.floor((navigator.hardwareConcurrency || 4)/2))), pattern:'FICAGEB_Liquid_####', skip:true});
+
+function normalizeLook(L){
+  const d = DEFAULT_LOOK(); if(!L || typeof L !== 'object') return d;
+  const out = Object.assign(d, L);
+  out.generator = GEN;
+  out.params = Object.assign(DEFAULT_LOOK().params, L.params || {});
+  out.motion = Object.assign(DEFAULT_LOOK().motion, L.motion || {});
+  if(!Array.isArray(out.palette) || out.palette.length !== 7) out.palette = [...DEFAULT_PALETTE];
+  out.idx = Array.isArray(out.idx) ? DEFAULT_IDX.map((v, k) => out.idx[k] ?? v) : [...DEFAULT_IDX];
+  out.centers = (Array.isArray(out.centers) && out.centers.length ? out.centers : [{}]).slice(0, MAXC).map(mkC);
+  return out;
+}
+
+/* ================= time model ================= */
+/* In loop mode every speed snaps to a whole number of turns per loop (at least one if it is not zero),
+   so the last frame flows into the first. Flow runs on a circle in noise space for the same reason. */
+function loopTurns(speed, L){
+  const dur = totalFramesOf(L)/L.motion.fps;
+  let q = Math.round(speed*dur/TAU);
+  if(q === 0 && Math.abs(speed) > 1e-6) q = Math.sign(speed);
+  return q;
+}
+function motionAngle(speed, L, frm){
+  if(L.motion.loop) return loopTurns(speed, L)*TAU*frm/totalFramesOf(L);
+  return speed*frm/L.motion.fps;
+}
+/* Smooth random hover, like a wiggle expression. Three detuned sines; in loop mode each snaps to whole turns and they stay distinct. */
+/* Hover reads smooth noise along a path. Looping: the path is a closed circle whose length grows with the speed,
+   so any speed loops seamlessly without snapping, and every center can wander at its own pace. */
+function hover(L, i, frm, axis, speed){
+  const total = totalFramesOf(L), dur = total/L.motion.fps, v = speed*0.55;
+  const ox = hh2(L.seed*7 + i, axis)*200, oy = hh2(L.seed*7 + i, axis + 5)*200, oz = axis*31.7 + i*11.3;
+  let n;
+  if(L.motion.loop){ const rr = v*dur/TAU, th = TAU*frm/total; n = snoise3(ox + rr*Math.cos(th), oy + rr*Math.sin(th), oz); }
+  else n = snoise3(ox + v*frm/L.motion.fps, oy, oz);
+  return clamp(n*1.5, -1.3, 1.3);
+}
+/* Per-center multipliers from the variation settings: same seed, same result. */
+function centerVar(L, i){
+  const P = L.params, r = k => hh2(P.varSeed*131 + 17, i*7 + k)*2 - 1;
+  return {sp:Math.max(0.05, 1 + P.speedVar*r(0)), hs:Math.max(0.05, 1 + P.hoverVar*r(1)*1.2), ha:Math.max(0, 1 + P.hoverAmtVar*r(2)),
+    rs:Math.max(0.05, 1 + P.rotVar*r(3)*1.2)*(P.rotMix && r(4) < 0 ? -1 : 1)};
+}
+/* Whole-shape rotation speed of a center in rad/s: positive turns counterclockwise, negative clockwise. */
+function rotSpeed(L, c, i){
+  const P = L.params; return (P.rotBase + c.rot)*P.rotAll*centerVar(L, i).rs*P.timeScale;
+}
+/* Animated center in uv units (short side = 1) and its current size factor. */
+function centerState(L, c, i, frm, W, H){
+  const P = L.params, mn = Math.min(W, H), hx = 0.5*W/mn, hy = 0.5*H/mn;
+  const ph = hh2(L.seed, i)*TAU + c.phase*Math.PI/180;
+  const cv = centerVar(L, i);
+  const dth = motionAngle(c.driftS*P.timeScale*cv.sp, L, frm) + ph*0.7;
+  let ux = c.x*hx + c.driftR*Math.cos(dth), uy = c.y*hy + c.driftR*Math.sin(dth), sz = 1;
+  const wa = (P.hoverBase + c.wigA)*P.wigAll*cv.ha, ws = c.wigS*P.wigSpeedAll*P.timeScale*cv.hs;
+  if(wa > 0 && ws > 0){ ux += wa*hover(L, i, frm, 0, ws); uy += wa*hover(L, i, frm, 1, ws); }
+  if(c.wigSize > 0 && ws > 0) sz = Math.max(0.05, 1 + c.wigSize*P.wigAll*cv.ha*hover(L, i, frm, 2, ws));
+  return {ux, uy, sz, hx, hy};
+}
+const hex2rgb = hx => { const n = parseInt(String(hx).slice(1), 16) || 0; return [(n >> 16 & 255)/255, (n >> 8 & 255)/255, (n & 255)/255]; };
+
+/* ================= shader ================= */
+const VERT = `#version 300 es
+void main(){ vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p*2.0 - 1.0, 0.0, 1.0); }`;
+const FRAG = `#version 300 es
+precision highp float;
+precision highp int;
+out vec4 O;
+uniform vec2 uFull, uOff;
+uniform int uN, uSteps, uView, uBlend, uBgMode;
+uniform vec4 uCen[8], uCS[8], uFl[8], uCol[8];
+uniform vec2 uZr[8];
+uniform vec2 uStretch;
+uniform float uFreq, uTurb, uDetail, uDetScale, uBody, uLogMix, uMerge, uColSharp;
+uniform float uPersp, uLim;
+uniform int uPulseMode;
+uniform int uEven;
+uniform float uFov, uCamZ, uStart, uMaxStep, uReach, uDensity;
+uniform vec3 uLight, uShadow;
+uniform float uGain, uExposure, uSat, uContrast, uHue, uOverK;
+uniform int uTone, uTransparent, uDimOn, uBgEase;
+uniform float uDimAmt, uDimIn, uDimOut, uVig, uGrain, uGrainPx, uFrame;
+uniform vec3 uBg1, uBg2, uBg3, uBg4;
+uniform float uBgAngle, uBgScale;
+
+float sdfC(vec3 p, int i){
+  vec4 C = uCen[i];
+  vec3 q = p - C.xyz;
+  vec2 zr = uZr[i];
+  q.xy = vec2(zr.x*q.x + zr.y*q.y, -zr.y*q.x + zr.x*q.y);
+  q.xy /= uStretch;
+  q /= C.w;
+  vec4 cs = uCS[i];
+  q.xz = vec2(cs.x*q.x - cs.y*q.z, cs.y*q.x + cs.x*q.z);
+  q.xy = vec2(cs.z*q.x - cs.w*q.y, cs.w*q.x + cs.z*q.y);
+  vec3 n = q*uFreq + uFl[i].xyz;
+  vec3 qb = uPulseMode == 1 ? q + vec3(uFl[i].w) : q*(1.0 - 0.2*uFl[i].w);
+  float r = length(qb);
+  float tb = sin(n.x + sin(n.z + sin(n.y)));
+  if(uDetail > 0.0){ vec3 m = n*uDetScale + vec3(1.7, 3.1, 5.3); tb += uDetail*sin(m.y + sin(m.x + sin(m.z))); }
+  float body = r*mix(1.0, log(r + 1.0), uLogMix);
+  return (body + tb*uTurb - uBody)*C.w*min(uStretch.x, uStretch.y);
+}
+float smin(float a, float b, float k){
+  if(k <= 1e-4) return min(a, b);
+  float h = clamp(0.5 + 0.5*(b - a)/k, 0.0, 1.0);
+  return mix(b, a, h) - k*h*(1.0 - h);
+}
+float mapD(vec3 p){
+  float d = 1e3;
+  for(int i = 0; i < 8; i++){ if(i >= uN) break; d = smin(d, sdfC(p, i), uMerge); }
+  return d;
+}
+float mapC(vec3 p, out vec3 col){
+  float d = 1e3; vec3 acc = vec3(0.0); float ws = 0.0;
+  for(int i = 0; i < 8; i++){
+    if(i >= uN) break;
+    float di = sdfC(p, i);
+    d = smin(d, di, uMerge);
+    float w = exp(-uColSharp*clamp(di, -2.0, 20.0));
+    acc += uCol[i].rgb*w; ws += w;
+  }
+  col = ws > 0.0 ? acc/ws : vec3(0.0);
+  return d;
+}
+vec3 hueShift(vec3 c, float a){ const vec3 k = vec3(0.57735); float ca = cos(a); return c*ca + cross(k, c)*sin(a) + k*dot(k, c)*(1.0 - ca); }
+float hash12(vec2 p){ uvec2 q = uvec2(ivec2(p))*uvec2(1597334673u, 3812015801u); uint n = (q.x ^ q.y)*1597334673u; n ^= n >> 15; n *= 2246822519u; return float(n)*(1.0/4294967295.0); }
+vec3 background(vec2 fc){
+  if(uBgMode == 0) return uBg1;
+  vec2 n = fc/uFull;
+  if(uBgMode == 4){
+    float tx = uBgEase == 1 ? smoothstep(0.0, 1.0, n.x) : n.x, ty = uBgEase == 1 ? smoothstep(0.0, 1.0, n.y) : n.y;
+    return mix(mix(uBg3, uBg4, tx), mix(uBg1, uBg2, tx), ty);
+  }
+  float mn = min(uFull.x, uFull.y);
+  vec2 p = (fc - 0.5*uFull)/mn, hx = 0.5*uFull/mn;
+  float t;
+  if(uBgMode == 3) t = length(p)/(length(hx)*uBgScale);
+  else { vec2 d = vec2(cos(uBgAngle), sin(uBgAngle)); float ext = abs(d.x)*hx.x + abs(d.y)*hx.y; t = dot(p, d)/ext*0.5 + 0.5; }
+  t = clamp(t, 0.0, 1.0); if(uBgEase == 1) t = smoothstep(0.0, 1.0, t);
+  if(uBgMode == 2) return t < 0.5 ? mix(uBg1, uBg2, t*2.0) : mix(uBg2, uBg3, t*2.0 - 1.0);
+  return mix(uBg1, uBg2, t);
+}
+void main(){
+  vec2 fc = gl_FragCoord.xy + uOff;
+  float mn = min(uFull.x, uFull.y);
+  vec2 uv = (fc - 0.5*uFull)/mn;
+  /* Perspective 1 is the original camera, 0 is orthographic. Wide frame correction keeps the
+     perspective of a 16:9 frame and slides the camera sideways beyond it, so bodies near the left
+     and right of very wide frames look the same as in the middle instead of fading out. */
+  vec2 uvc = uLim > 0.0 ? clamp(uv, -uLim, uLim) : uv;
+  vec3 dir = vec3(uvc*uFov*uPersp, -1.0);
+  float dk = 1.0;
+  vec3 ro = vec3((uv - uvc*uPersp)*uFov*uCamZ, uCamZ), rd = normalize(dir);
+  vec3 col = vec3(0.0);
+  float d = uStart*dk;
+  if(uN > 0) for(int i = 0; i < 32; i++){
+    if(i >= uSteps) break;
+    vec3 p = ro + rd*d, gc;
+    float rz = mapC(p, gc);
+    float f = clamp((rz - mapD(p + uLight))*0.5, -0.1, 1.0);
+    vec3 base = uShadow + gc*uGain*f;
+    col = col*base + smoothstep(uReach, 0.0, rz)*uDensity*base;
+    d += min(rz, uMaxStep*dk);
+  }
+  vec3 neb = max(col*uExposure, 0.0);
+  if(uTone == 1) neb = 1.0 - exp(-neb);
+  if(uHue != 0.0) neb = max(hueShift(neb, uHue), 0.0);
+  float lum = dot(neb, vec3(0.2126, 0.7152, 0.0722));
+  neb = max(mix(vec3(lum), neb, uSat), 0.0);
+  neb = 0.5*pow(neb*2.0, vec3(uContrast));
+  if(uDimOn == 1){
+    float rad = mn*0.5, dist = distance(fc, 0.5*uFull);
+    neb = mix(neb*(1.0 - uDimAmt), neb, smoothstep(rad*uDimIn, rad*max(uDimOut, uDimIn + 0.001), dist));
+  }
+  vec2 nn = fc/uFull - 0.5;
+  float vig = 1.0 - uVig*smoothstep(0.35, 1.0, length(nn)*1.4142);
+  float g = (hash12(floor(fc/uGrainPx) + vec2(uFrame*17.0, uFrame*29.0)) - 0.5)*uGrain;
+  float dith = (hash12(fc + vec2(uFrame*7.0, 3.0)) - 0.5)/255.0;
+  float mx = max(neb.r, max(neb.g, neb.b));
+  if(uTransparent == 1 && uView != 2){
+    float a = clamp(mx, 0.0, 1.0)*vig;
+    vec3 c = mx > 1e-5 ? clamp(neb/mx, 0.0, 1.0) : vec3(0.0);
+    O = vec4(clamp(c + g, 0.0, 1.0), clamp(a + dith, 0.0, 1.0));
+    return;
+  }
+  vec3 bg = background(fc), outc;
+  if(uView == 1) outc = neb;
+  else if(uView == 2) outc = bg;
+  else if(uBlend == 0) outc = bg + neb;
+  else if(uBlend == 1) outc = 1.0 - (1.0 - bg)*(1.0 - clamp(neb, 0.0, 1.0));
+  else { float a = clamp(mx*uOverK, 0.0, 1.0); outc = mix(bg, mx > 1e-5 ? neb/mx : bg, a); }
+  outc = outc*vig + g + dith;
+  O = vec4(clamp(outc, 0.0, 1.0), 1.0);
+}`;
+
+function makeRenderer(canvas){
+  const gl = canvas.getContext('webgl2', {alpha:true, premultipliedAlpha:false, antialias:false, preserveDrawingBuffer:true, depth:false, stencil:false});
+  if(!gl) throw new Error('WebGL 2 is not available. Open this file in a current Chrome, Edge, Firefox or Safari.');
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if(!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('Shader error: ' + gl.getShaderInfoLog(s)); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG)); gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error('Shader link error: ' + gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  gl.bindVertexArray(gl.createVertexArray());
+  const U = {};
+  for(let i = 0, n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS); i < n; i++){ const inf = gl.getActiveUniform(prog, i); U[inf.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(prog, inf.name); }
+  const f1 = (k, v) => U[k] && gl.uniform1f(U[k], v), i1 = (k, v) => U[k] && gl.uniform1i(U[k], v);
+  const f2 = (k, a, b) => U[k] && gl.uniform2f(U[k], a, b), f3 = (k, v) => U[k] && gl.uniform3f(U[k], v[0], v[1], v[2]);
+  const v4 = (k, arr) => U[k] && gl.uniform4fv(U[k], arr);
+  const zr = new Float32Array(16), cen = new Float32Array(32), cs = new Float32Array(32), fl = new Float32Array(32), co = new Float32Array(32);
+  const maxDim = Math.min(gl.getParameter(gl.MAX_VIEWPORT_DIMS)[0], gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+  return {gl, canvas, tile:Math.min(2048, maxDim),
+    /* Draws the region (ox, oy, tw, th) of a W×H frame (top-left origin) into the bottom-left of the canvas. */
+    draw(L, frm, W, H, ox, oy, tw, th, vw = 'result', refW = W){
+      const P = L.params, M = L.motion, total = totalFramesOf(L), dur = total/M.fps, camZ = 5;
+      const mn = Math.min(W, H), hx = 0.5*W/mn, hy = 0.5*H/mn, wk = P.zoom*camZ;
+      const act = []; L.centers.forEach((c, i) => { if(c.on && act.length < MAXC) act.push([c, i]); });
+      act.forEach(([c, i], j) => {
+        const ph = hh2(L.seed, i)*TAU + c.phase*Math.PI/180, ts = P.timeScale*c.speed*centerVar(L, i).sp;
+        const st = centerState(L, c, i, frm, W, H);
+        cen.set([st.ux*wk, st.uy*wk, 0, Math.max(0.01, c.size*st.sz*P.scale)], j*4);
+        const a = motionAngle(P.spinX*ts, L, frm) + ph, b = motionAngle(P.spinY*ts, L, frm) + ph*1.618;
+        cs.set([Math.cos(a), Math.sin(a), Math.cos(b), Math.sin(b)], j*4);
+        const g = motionAngle(rotSpeed(L, c, i), L, frm) + c.angle*Math.PI/180;
+        zr.set([Math.cos(g), Math.sin(g)], j*2);
+        const so = [hh2(L.seed, i + 50)*40, hh2(L.seed, i + 90)*40, hh2(L.seed, i + 130)*40];
+        let off;
+        if(M.loop){ const Rr = P.flow*ts*Math.sqrt(3)*dur/TAU, th0 = TAU*frm/total + ph; off = [so[0] + Rr*Math.cos(th0), so[1] + Rr*Math.sin(th0), so[2] + Rr*Math.cos(th0 + 2)]; }
+        else { const tt = P.flow*ts*frm/M.fps; off = [so[0] + tt, so[1] + tt, so[2] + tt]; }
+        const pul = Math.sin(motionAngle(P.pulse*ts, L, frm) + ph*2.3)*P.wobble;
+        fl.set([off[0], off[1], off[2], pul], j*4);
+        const rgb = hex2rgb(L.palette[c.col]);
+        co.set([rgb[0]*c.bright, rgb[1]*c.bright, rgb[2]*c.bright, 1], j*4);
+      });
+      gl.viewport(0, 0, tw, th);
+      f2('uFull', W, H); f2('uOff', ox, H - (oy + th));
+      i1('uN', act.length); i1('uSteps', P.steps);
+      i1('uView', vw === 'nebula' ? 1 : vw === 'bg' ? 2 : 0);
+      i1('uBlend', P.blend === 'screen' ? 1 : P.blend === 'over' ? 2 : 0);
+      i1('uBgMode', ['solid','linear','linear3','radial','corners'].indexOf(P.bgMode));
+      U.uZr && gl.uniform2fv(U.uZr, zr); v4('uCen', cen); v4('uCS', cs); v4('uFl', fl); v4('uCol', co);
+      f2('uStretch', P.stretchX, P.stretchY);
+      f1('uFreq', P.freq); f1('uTurb', P.turb); f1('uDetail', P.detail); f1('uDetScale', P.detScale);
+      f1('uBody', P.body); f1('uLogMix', P.logMix); f1('uMerge', P.merge); f1('uColSharp', P.colSharp);
+      f1('uFov', P.zoom); f1('uPersp', P.persp); f1('uLim', P.wideFix ? 0.8889 : 0); i1('uPulseMode', P.pulseMode === 'swing' ? 1 : 0); f1('uCamZ', camZ); f1('uStart', P.start); f1('uMaxStep', P.maxStep); f1('uReach', P.reach); f1('uDensity', P.density);
+      const az = P.lightAz*Math.PI/180, el = P.lightEl*Math.PI/180;
+      f3('uLight', [Math.cos(el)*Math.cos(az)*P.shade, Math.sin(el)*P.shade, Math.cos(el)*Math.sin(az)*P.shade]);
+      f3('uShadow', hex2rgb(L.palette[L.idx[4]]).map(v => v*P.shadowAmt));
+      f1('uGain', P.gain); f1('uExposure', P.exposure); f1('uSat', P.sat); f1('uContrast', P.contrast); f1('uHue', P.hue*Math.PI/180); f1('uOverK', P.overK);
+      i1('uTone', P.tone ? 1 : 0); i1('uTransparent', P.transparent ? 1 : 0); i1('uDimOn', P.dimOn ? 1 : 0); i1('uBgEase', P.bgEase ? 1 : 0);
+      f1('uDimAmt', P.dimAmt); f1('uDimIn', P.dimIn); f1('uDimOut', P.dimOut); f1('uVig', P.vig); f1('uGrain', P.grain);
+      f1('uGrainPx', Math.max(0.05, P.grainSize*W/refW)); f1('uFrame', frm % 4096);
+      for(let k = 0; k < 4; k++) f3('uBg' + (k + 1), hex2rgb(L.palette[L.idx[k]]));
+      f1('uBgAngle', P.bgAngle*Math.PI/180); f1('uBgScale', P.bgScale);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      return act.length;
+    }};
+}
+
+
+const totalFramesOf = L => Math.max(2, Math.round(L.motion.dur*L.motion.fps));
+/* ================= showcase embed =================
+   URL options:  ?look=Trio   start on a starter look
+                 &cycle=14    seconds per look (0 = stay)
+                 &ui=0        hide the overlay (pure background)
+                 &tool=URL    where "Open the tool" points          */
+const Q = new URLSearchParams(location.search);
+const ORDER = ['Calm drift','Hover field','Trio','Violet core','Twin cells','Wide band','Constellation','Green signal','Soft light','Nebula'];
+let lookIdx = Math.max(0, ORDER.indexOf(Q.get('look') || ''));
+const CYCLE = Q.has('cycle') ? Math.max(0, +Q.get('cycle') || 0) : 14;
+if(Q.get('ui') === '0') document.body.classList.add('noui');
+document.getElementById('tool').href = Q.get('tool') || 'FICAGEB_Liquid_V0_5.html';
+
+function buildLook(name){
+  const st = STARTERS[name], L = DEFAULT_LOOK();
+  L.params = Object.assign(L.params, st.p || {});
+  L.centers = (st.c || [{}]).map(mkC);
+  L.palette = [...(st.pal || DEFAULT_PALETTE)];
+  L.idx = [...(st.idx || DEFAULT_IDX)];
+  L.motion = {dur:20, fps:30, loop:false}; // free-running: no loop seam needed on a web page
+  return normalizeLook(L);
+}
+
+const cv = document.getElementById('cv');
+let G;
+try{ G = makeRenderer(cv); }
+catch(err){
+  cv.remove(); document.querySelector('.bar').remove();
+  document.body.append(Object.assign(document.createElement('p'), {className:'fallback', textContent:'This piece needs WebGL 2. Open the page in a current Chrome, Edge, Firefox or Safari.'}));
+  throw err;
+}
+
+let look, t = 4, playing = true, visible = true, onScreen = true, last = performance.now(), lookT = 0;
+let q = 0.6;                       // render scale, adapts to the machine
+const ptr = {x:0, y:0, tx:0, ty:0};
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function setLook(i, fade){
+  lookIdx = (i + ORDER.length) % ORDER.length;
+  const apply = () => {
+    look = buildLook(ORDER[lookIdx]);
+    document.getElementById('lookName').textContent = ORDER[lookIdx];
+    document.body.dataset.tone = look.params.blend === 'over' ? 'light' : 'dark';
+    lookT = 0; draw(); cv.classList.remove('fade');
+  };
+  if(fade && !reduce){ cv.classList.add('fade'); setTimeout(apply, 350); } else apply();
+}
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+  let w = innerWidth*dpr*q, h = innerHeight*dpr*q;
+  const cap = Math.sqrt(1.6e6/(w*h)); if(cap < 1){ w *= cap; h *= cap; }
+  cv.width = Math.max(2, Math.min(G.tile, Math.round(w)));
+  cv.height = Math.max(2, Math.min(G.tile, Math.round(h)));
+  draw();
+}
+addEventListener('resize', resize);
+
+function draw(){
+  if(!look) return;
+  // gentle pointer parallax: nearer centers move a bit more
+  const L = Object.assign({}, look, {centers:look.centers.map((c, i) => Object.assign({}, c, {x:c.x + ptr.x*0.05*(1 + 0.25*(i % 3)), y:c.y + ptr.y*0.05*(1 + 0.25*(i % 3))}))});
+  G.draw(L, t*look.motion.fps, cv.width, cv.height, 0, 0, cv.width, cv.height, 'result', cv.width);
+}
+
+let fN = 0, fT = 0;
+function tick(now){
+  const dt = Math.min(0.1, (now - last)/1000); last = now;
+  const running = playing && visible && onScreen;
+  if(running){
+    t += dt; lookT += dt;
+    ptr.x += (ptr.tx - ptr.x)*Math.min(1, dt*3); ptr.y += (ptr.ty - ptr.y)*Math.min(1, dt*3);
+    draw();
+    if(CYCLE && lookT > CYCLE) setLook(lookIdx + 1, true);
+    fN++; fT += dt;
+    if(fT > 1.5){ const fps = fN/fT; fN = 0; fT = 0;
+      if(fps < 45 && q > 0.3){ q *= 0.85; resize(); } else if(fps > 58 && q < 0.75){ q = Math.min(0.75, q*1.08); resize(); } }
+  }
+  requestAnimationFrame(tick);
+}
+
+const playB = document.getElementById('play');
+function setPlaying(v){ playing = v; playB.textContent = v ? 'Pause' : 'Play'; }
+playB.addEventListener('click', () => setPlaying(!playing));
+document.getElementById('next').addEventListener('click', () => setLook(lookIdx + 1, true));
+addEventListener('keydown', e => {
+  if(e.code === 'Space' && e.target.tagName !== 'BUTTON'){ e.preventDefault(); setPlaying(!playing); }
+  if(e.key === 'n' || e.key === 'ArrowRight') setLook(lookIdx + 1, true);
+  if(e.key === 'ArrowLeft') setLook(lookIdx - 1, true);
+});
+addEventListener('pointermove', e => { ptr.tx = e.clientX/innerWidth*2 - 1; ptr.ty = 1 - e.clientY/innerHeight*2; wake(); });
+addEventListener('pointerleave', () => { ptr.tx = ptr.ty = 0; });
+
+// hide the overlay after a few still seconds so the piece reads cleanly
+let idleT; function wake(){ document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => document.body.classList.add('idle'), 3000); }
+addEventListener('focusin', wake); wake();
+
+// stop drawing when the tab is hidden or the embed is scrolled out of view
+document.addEventListener('visibilitychange', () => { visible = !document.hidden; last = performance.now(); });
+new IntersectionObserver(es => { onScreen = es[0].isIntersecting; last = performance.now(); }).observe(document.body);
+
+setLook(lookIdx, false);
+resize();
+if(reduce) setPlaying(false);
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
