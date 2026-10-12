@@ -563,8 +563,10 @@ addEventListener('pointermove', e => { ptr.tx = e.clientX/innerWidth*2 - 1; ptr.
 addEventListener('pointerleave', () => { ptr.tx = ptr.ty = 0; });
 
 // hide the overlay after a few still seconds so the piece reads cleanly
-let idleT; function wake(){ document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(() => document.body.classList.add('idle'), 3000); }
-addEventListener('focusin', wake); wake();
+// &controls=always keeps them on; touch screens (no hover) also keep them on
+const KEEP = Q.get('controls') === 'always' || matchMedia('(hover: none)').matches;
+let idleT; function wake(){ document.body.classList.remove('idle'); clearTimeout(idleT); if(!KEEP) idleT = setTimeout(() => document.body.classList.add('idle'), 4000); }
+addEventListener('focusin', wake); addEventListener('pointerdown', wake); addEventListener('pointerenter', wake); wake();
 
 // stop drawing when the tab is hidden or the embed is scrolled out of view
 document.addEventListener('visibilitychange', () => { visible = !document.hidden; last = performance.now(); });
